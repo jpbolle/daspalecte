@@ -52,7 +52,7 @@ Extension Chrome d'aide à la lecture pour les étudiants en Français Langue É
 
 1. Clonez le dépôt :
 ```bash
-git clone https://github.com/votre-username/daspalecte.git
+git clone https://github.com/jpbolle/daspalecte.git
 cd daspalecte
 ```
 
