@@ -1,0 +1,124 @@
+:root {
+  --neon-cyan: #00f3ff;
+  --neon-magenta: #ff00ff;
+  --bg-dark: #0a0b1e;
+  --glass-bg: rgba(255, 255, 255, 0.05);
+  --glass-border: rgba(255, 255, 255, 0.1);
+}
+
+body {
+  width: 320px;
+  margin: 0;
+  padding: 0;
+  background-color: var(--bg-dark);
+  color: white;
+  font-family: 'Inter', sans-serif;
+  overflow: hidden;
+}
+
+.glass-container {
+  padding: 24px;
+  background: linear-gradient(135deg, rgba(0, 243, 255, 0.05), rgba(255, 0, 255, 0.05));
+  border: 1px solid var(--glass-border);
+  min-height: 400px;
+  /* Augmenté pour garantir de l'espace */
+  display: flex;
+  flex-direction: column;
+}
+
+header {
+  text-align: center;
+  margin-bottom: 24px;
+}
+
+.neon-text {
+  font-family: 'Orbitron', sans-serif;
+  font-size: 1.8rem;
+  margin: 0;
+  color: var(--neon-cyan);
+  text-shadow: 0 0 10px rgba(0, 243, 255, 0.5), 0 0 20px rgba(0, 243, 255, 0.3);
+  letter-spacing: 2px;
+}
+
+.subtitle {
+  font-size: 0.8rem;
+  opacity: 0.7;
+  margin-top: 4px;
+  letter-spacing: 1px;
+}
+
+.button-group {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.futuristic-btn {
+  background: var(--glass-bg);
+  border: 1px solid var(--neon-cyan);
+  /* Bordure bleue par défaut */
+  box-shadow: 0 0 10px rgba(0, 243, 255, 0.1);
+  color: white;
+  padding: 12px 16px;
+  border-radius: 8px;
+  font-family: 'Orbitron', sans-serif;
+  font-size: 0.9rem;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  position: relative;
+  overflow: hidden;
+}
+
+.futuristic-btn:hover {
+  background: rgba(255, 255, 255, 0.1);
+  border-color: var(--neon-magenta);
+  /* Devient rose au survol */
+  box-shadow: 0 0 15px rgba(255, 0, 255, 0.4);
+  transform: translateY(-2px);
+}
+
+.futuristic-btn.primary {
+  border-color: var(--neon-cyan);
+  /* Unifié en bleu d'office */
+  box-shadow: 0 0 10px rgba(0, 243, 255, 0.2);
+}
+
+.futuristic-btn.primary:hover {
+  border-color: var(--neon-magenta);
+  background: rgba(255, 255, 255, 0.15);
+  box-shadow: 0 0 20px rgba(255, 0, 255, 0.5);
+}
+
+.btn-icon {
+  font-size: 1.2rem;
+}
+
+.branding-footer {
+  margin-top: auto;
+  padding-top: 16px;
+  border-top: 1px solid var(--glass-border);
+  display: flex;
+  flex-direction: row;
+  justify-content: center;
+  align-items: center;
+  gap: 15px;
+}
+
+.branding-footer p {
+  margin: 0;
+  font-size: 0.7rem;
+  color: var(--neon-cyan);
+  opacity: 0.7;
+  font-family: 'Orbitron', sans-serif;
+  letter-spacing: 1px;
+  white-space: nowrap;
+}
+
+.branding-logo {
+  height: 50px;
+  width: auto;
+  filter: drop-shadow(0 0 5px rgba(255, 255, 255, 0.2));
+}

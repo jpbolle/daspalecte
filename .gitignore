@@ -1,0 +1,18 @@
+# Fichiers de travail et temporaires
+chrome-store-description.txt
+test-ligatures.html
+daspalecte-extension.zip
+
+# Dossier backend (à gérer séparément avec secrets)
+cloud-function/
+
+# Système
+.DS_Store
+*.log
+node_modules/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo

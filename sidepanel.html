@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<html lang="fr">
+
+<head>
+    <meta charset="UTF-8">
+    <title>Outils de lecture - Daspalecte</title>
+    <link rel="stylesheet" href="sidepanel.css">
+    <link
+        href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700&family=Inter:wght@300;400;600&display=swap"
+        rel="stylesheet">
+</head>
+
+<body>
+    <div class="panel-container">
+        <!-- Bouton X de fermeture -->
+        <button id="close-panel-btn" class="close-panel-btn" title="Fermer le panneau">×</button>
+        
+        <header>
+            <h1 class="neon-text">Tools</h1>
+        </header>
+
+        <section class="tool-section">
+            <div class="section-header">
+                <h2>Traducteur</h2>
+                <label class="switch">
+                    <input type="checkbox" id="translator-toggle">
+                    <span class="slider round"></span>
+                </label>
+            </div>
+            <div class="section-content">
+                <select id="language-select" class="futuristic-select">
+                    <option value="ar">Arabe</option>
+                    <option value="en">Anglais</option>
+                    <option value="fa">Dari</option>
+                    <option value="es">Espagnol</option>
+                    <option value="ps">Pashto</option>
+                    <option value="pl">Polonais</option>
+                    <option value="ro">Roumain</option>
+                    <option value="ru">Russe</option>
+                    <option value="tr">Turc</option>
+                    <option value="uk">Ukrainien</option>
+                </select>
+            </div>
+        </section>
+
+        <section class="tool-section">
+            <div class="section-header">
+                <h2>Mots</h2>
+                <button id="select-all" class="text-link">Tout cocher</button>
+            </div>
+            <div class="section-content">
+                <div id="word-list" class="word-list-container">
+                    <p class="empty-msg">Aucun mot sélectionné</p>
+                </div>
+                <div class="actions-bar" id="words-actions" style="display: none;">
+                    <button id="delete-selected" class="icon-btn delete hidden" title="Supprimer la sélection">
+                        <span class="icon">🗑️</span>
+                    </button>
+                    <button id="gen-exercises" class="action-btn">Générer des exercices</button>
+                </div>
+            </div>
+        </section>
+
+        <section class="tool-section">
+            <div class="section-header">
+                <h2>Compréhension</h2>
+                <label class="switch">
+                    <input type="checkbox" id="comprehension-toggle">
+                    <span class="slider round"></span>
+                </label>
+            </div>
+            <div class="section-content">
+                <div class="field-group">
+                    <label for="native-language-select">Ma langue maternelle :</label>
+                    <select id="native-language-select" class="futuristic-select">
+                        <option value="ar">Arabe</option>
+                        <option value="en">Anglais</option>
+                        <option value="fa">Dari</option>
+                        <option value="es">Espagnol</option>
+                        <option value="ps">Pashto</option>
+                        <option value="pl">Polonais</option>
+                        <option value="ro">Roumain</option>
+                        <option value="ru">Russe</option>
+                        <option value="tr">Turc</option>
+                        <option value="uk">Ukrainien</option>
+                    </select>
+                </div>
+            </div>
+        </section>
+
+        <footer class="branding-footer">
+            <p>2025 - version 1.2</p>
+            <img src="https://drive.google.com/thumbnail?id=17m5J5zlV1SrLhJeX8JBzK2QZMWwFgXgf&sz=w500"
+                alt="Logo PedagokIT" class="branding-logo">
+        </footer>
+    </div>
+    <script src="sidepanel.js"></script>
+</body>
+
+</html>
