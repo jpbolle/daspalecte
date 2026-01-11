@@ -174,22 +174,19 @@ Les paramètres sont stockés localement via Chrome Storage API :
 
 ## API Backend
 
-### Endpoint
-```
-https://daspalecte-1086562672385.europe-west1.run.app
-```
+L'extension utilise un backend sécurisé hébergé sur **Google Cloud Run** (région Europe-West1) pour :
 
-### Actions disponibles
-
-**1. `summarize`** - Aide à la compréhension
+**1. Aide à la compréhension** (`summarize`)
 - Génère un résumé (max 30 mots) + reformulation complète
 - Ajoute des traductions entre parenthèses pour les mots difficiles
 - Retour JSON : `{summary: "...", reformulation: "..."}`
 
-**2. `generate_exercises`** - Génération d'exercices
+**2. Génération d'exercices** (`generate_exercises`)
 - Crée 5 exercices progressifs en français
 - Types : matching, family, tags, reading, cloze
 - Adapté au niveau FLE avec traductions d'aide
+
+**Note** : L'URL de l'endpoint n'est pas publique pour éviter les abus et protéger les quotas API.
 
 ## Développement
 
