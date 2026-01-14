@@ -28,7 +28,7 @@ Extension Chrome d'aide à la lecture pour les étudiants en Français Langue É
   - **Résumé** : Une phrase de maximum 30 mots capturant l'idée principale
   - **Reformulation** : Texte complet simplifié avec traductions des mots difficiles
 - **Traduction contextuelle** : Mots difficiles traduits entre parenthèses dans votre langue maternelle
-- **Propulsé par Claude 3 Haiku** : IA rapide et performante via Google Cloud Functions
+- **Propulsé par Claude Sonnet 4.5** : IA de dernière génération pour simplifications et exercices de haute qualité
 - **Affichage dynamique** : Activez/désactivez les simplifications à volonté
 - **Compatible avec le traducteur** : Les deux outils peuvent être actifs simultanément
 
@@ -125,7 +125,7 @@ daspalecte/
 
 ### Backend
 - **Google Cloud Functions** : Serverless
-- **Claude 3 Haiku** : Modèle IA rapide et économique pour simplifications et exercices
+- **Claude Sonnet 4.5** : Modèle IA de dernière génération (septembre 2025) pour simplifications et exercices
 - **Google Translate API** : Traductions mot à mot
 - **Google Secret Manager** : Sécurisation des clés API
 - **Node.js** : Runtime
