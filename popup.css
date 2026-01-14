@@ -96,6 +96,57 @@ header {
   font-size: 1.2rem;
 }
 
+.language-section {
+  margin-top: 16px;
+  padding: 12px 0;
+  border-top: 1px solid var(--glass-border);
+  border-bottom: 1px solid var(--glass-border);
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+}
+
+.language-section label {
+  display: block;
+  font-size: 0.85rem;
+  margin-bottom: 8px;
+  color: var(--neon-magenta);
+  font-family: 'Orbitron', sans-serif;
+  letter-spacing: 0.5px;
+  width: 100%;
+  text-align: left;
+}
+
+.futuristic-select {
+  width: 50%;
+  padding: 10px 12px;
+  background: var(--glass-bg);
+  border: 1px solid var(--neon-magenta);
+  border-radius: 6px;
+  color: white;
+  font-family: 'Inter', sans-serif;
+  font-size: 0.9rem;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  outline: none;
+}
+
+.futuristic-select:hover {
+  background: rgba(255, 255, 255, 0.1);
+  border-color: var(--neon-cyan);
+  box-shadow: 0 0 10px rgba(0, 243, 255, 0.2);
+}
+
+.futuristic-select:focus {
+  border-color: var(--neon-magenta);
+  box-shadow: 0 0 15px rgba(255, 0, 255, 0.3);
+}
+
+.futuristic-select option {
+  background-color: var(--bg-dark);
+  color: white;
+}
+
 .branding-footer {
   margin-top: auto;
   padding-top: 16px;

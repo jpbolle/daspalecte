@@ -291,7 +291,6 @@ class DaspalecteTranslator {
     async loadSettings() {
         console.log('[CONTENT] 🔧 loadSettings() appelée');
         const result = await chrome.storage.local.get([
-            'selectedLanguage',
             'nativeLanguage'
         ]);
 
@@ -301,8 +300,10 @@ class DaspalecteTranslator {
         // par l'utilisateur via le sidepanel.
         this.isEnabled = false;
         this.isComprehensionEnabled = false;
-        this.targetLang = result.selectedLanguage || 'en';
-        this.nativeLanguage = result.nativeLanguage || 'en';
+        // Utiliser nativeLanguage pour les deux (traduction et compréhension)
+        const lang = result.nativeLanguage || 'en';
+        this.targetLang = lang;
+        this.nativeLanguage = lang;
         this.sourceLang = 'auto';
 
         console.log('[CONTENT] 🔧 État initial après loadSettings:', {
@@ -520,6 +521,7 @@ class DaspalecteTranslator {
                     'Content-Type': 'application/json',
                 },
                 body: JSON.stringify({
+                    action: 'summarize',
                     text: text,
                     nativeLanguage: nativeLang
                 })
@@ -527,6 +529,7 @@ class DaspalecteTranslator {
 
             if (!response.ok) {
                 const errorData = await response.json();
+                console.error('[CONTENT] Erreur backend détaillée:', errorData);
                 throw new Error(errorData.message || 'Erreur lors du résumé');
             }
 
@@ -568,7 +571,11 @@ class DaspalecteTranslator {
                 })
             });
 
-            if (!response.ok) throw new Error('Erreur lors de la génération');
+            if (!response.ok) {
+                const errorData = await response.json();
+                console.error('[CONTENT] Erreur backend détaillée:', errorData);
+                throw new Error('Erreur lors de la génération');
+            }
 
             const data = await response.json();
             this.displayExercises(data.exercises);

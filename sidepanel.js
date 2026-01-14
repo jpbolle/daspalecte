@@ -1,15 +1,16 @@
 const wordListContainer = document.getElementById('word-list');
 const translatorToggle = document.getElementById('translator-toggle');
-const languageSelect = document.getElementById('language-select');
 const selectAllBtn = document.getElementById('select-all');
 const wordsActions = document.getElementById('words-actions');
 const deleteSelectedBtn = document.getElementById('delete-selected');
 const comprehensionToggle = document.getElementById('comprehension-toggle');
-const nativeLanguageSelect = document.getElementById('native-language-select');
 const closePanelBtn = document.getElementById('close-panel-btn');
 
 // Flag pour éviter les cascades d'événements
 let isUpdatingToggles = false;
+
+// Variable locale pour la langue maternelle (chargée depuis storage)
+let nativeLanguage = 'en'; // Valeur par défaut
 
 // Fonction pour envoyer des messages au content script (parent window)
 function sendToContentScript(message) {
@@ -130,30 +131,16 @@ translatorToggle.addEventListener('change', () => {
     const message = {
         type: 'settingsChanged',
         enabled: translatorToggle.checked,
-        targetLang: languageSelect.value,
+        targetLang: nativeLanguage,
         sourceLang: 'auto',
         comprehensionEnabled: comprehensionToggle.checked,
-        nativeLanguage: nativeLanguageSelect.value
+        nativeLanguage: nativeLanguage
     };
 
     console.log('[SIDEPANEL] 📤 Envoi message vers content script:', message);
     sendToContentScript(message);
 
     isUpdatingToggles = false;
-});
-
-languageSelect.addEventListener('change', () => {
-    chrome.storage.local.set({ selectedLanguage: languageSelect.value });
-
-    // Envoyer au content script via postMessage
-    sendToContentScript({
-        type: 'settingsChanged',
-        enabled: translatorToggle.checked,
-        targetLang: languageSelect.value,
-        sourceLang: 'auto',
-        comprehensionEnabled: comprehensionToggle.checked,
-        nativeLanguage: nativeLanguageSelect.value
-    });
 });
 
 // Événements pour la compréhension
@@ -175,10 +162,10 @@ comprehensionToggle.addEventListener('change', () => {
     const message = {
         type: 'settingsChanged',
         enabled: translatorToggle.checked,
-        targetLang: languageSelect.value,
+        targetLang: nativeLanguage,
         sourceLang: 'auto',
         comprehensionEnabled: comprehensionToggle.checked,
-        nativeLanguage: nativeLanguageSelect.value
+        nativeLanguage: nativeLanguage
     };
 
     console.log('[SIDEPANEL] 📤 Envoi message vers content script:', message);
@@ -187,29 +174,26 @@ comprehensionToggle.addEventListener('change', () => {
     isUpdatingToggles = false;
 });
 
-nativeLanguageSelect.addEventListener('change', () => {
-    chrome.storage.local.set({ nativeLanguage: nativeLanguageSelect.value });
-
-    sendToContentScript({
-        type: 'settingsChanged',
-        enabled: translatorToggle.checked,
-        targetLang: languageSelect.value,
-        sourceLang: 'auto',
-        comprehensionEnabled: comprehensionToggle.checked,
-        nativeLanguage: nativeLanguageSelect.value
-    });
-});
-
-// Initialize state - Charger les langues depuis le storage
-chrome.storage.local.get(['selectedLanguage', 'nativeLanguage'], (data) => {
+// Initialize state - Charger la langue maternelle depuis le storage
+chrome.storage.local.get(['nativeLanguage'], (data) => {
     // Les toggles sont toujours désactivés visuellement au démarrage
     // (le content script gère l'état réel)
     translatorToggle.checked = false;
     comprehensionToggle.checked = false;
 
-    // Charger uniquement les langues sauvegardées
-    if (data.selectedLanguage) languageSelect.value = data.selectedLanguage;
-    if (data.nativeLanguage) nativeLanguageSelect.value = data.nativeLanguage;
+    // Charger la langue maternelle sauvegardée
+    if (data.nativeLanguage) {
+        nativeLanguage = data.nativeLanguage;
+    }
+    console.log('[SIDEPANEL] Langue maternelle chargée:', nativeLanguage);
+});
+
+// Écouter les changements de langue depuis le storage (quand changée dans popup)
+chrome.storage.onChanged.addListener((changes, namespace) => {
+    if (namespace === 'local' && changes.nativeLanguage) {
+        nativeLanguage = changes.nativeLanguage.newValue;
+        console.log('[SIDEPANEL] Langue maternelle mise à jour:', nativeLanguage);
+    }
 });
 
 // Button triggers (basés sur la sélection)
@@ -225,7 +209,7 @@ document.getElementById('gen-exercises').addEventListener('click', () => {
     sendToContentScript({
         type: 'GENERATE_EXERCISES',
         words: selectedWords,
-        targetLanguage: languageSelect.value
+        targetLanguage: nativeLanguage
     });
 });
 
