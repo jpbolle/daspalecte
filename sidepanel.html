@@ -32,16 +32,16 @@
         <section class="tool-section">
             <div class="section-header">
                 <h2>Mots</h2>
-                <button id="select-all" class="text-link">Tout cocher</button>
+                <div class="section-header-actions">
+                    <button id="delete-selected" class="header-icon-btn hidden" title="Supprimer la sélection">🗑️</button>
+                    <button id="select-all" class="text-link">Tout cocher</button>
+                </div>
             </div>
             <div class="section-content">
                 <div id="word-list" class="word-list-container">
                     <p class="empty-msg">Aucun mot sélectionné</p>
                 </div>
                 <div class="actions-bar" id="words-actions" style="display: none;">
-                    <button id="delete-selected" class="icon-btn delete hidden" title="Supprimer la sélection">
-                        <span class="icon">🗑️</span>
-                    </button>
                     <button id="gen-exercises" class="action-btn">Générer des exercices</button>
                 </div>
             </div>
@@ -57,8 +57,21 @@
             </div>
         </section>
 
+        <section class="tool-section">
+            <div class="section-header">
+                <h2>Test de lecture</h2>
+                <label class="switch">
+                    <input type="checkbox" id="reading-test-toggle">
+                    <span class="slider round"></span>
+                </label>
+            </div>
+            <div id="ct-restore-container" style="display: none; margin-top: 10px;">
+                <button id="ct-restore-btn" class="action-btn">📝 Afficher le test</button>
+            </div>
+        </section>
+
         <footer class="branding-footer">
-            <p>2025 - version 1.3</p>
+            <p>2026 - version 1.4</p>
             <img src="https://drive.google.com/thumbnail?id=17m5J5zlV1SrLhJeX8JBzK2QZMWwFgXgf&sz=w500"
                 alt="Logo PedagokIT" class="branding-logo">
         </footer>

@@ -5,7 +5,8 @@
   "description": "Aide à la lecture et compréhension pour élèves DASPA.",
   "permissions": [
     "storage",
-    "activeTab"
+    "activeTab",
+    "identity"
   ],
   "host_permissions": [
     "<all_urls>"

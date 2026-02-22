@@ -104,6 +104,30 @@ h2 {
     opacity: 0.9;
 }
 
+.section-header-actions {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.header-icon-btn {
+    background: none;
+    border: none;
+    cursor: pointer;
+    font-size: 1rem;
+    padding: 2px 4px;
+    border-radius: 4px;
+    transition: all 0.2s ease;
+    opacity: 0.8;
+}
+.header-icon-btn:hover {
+    background: rgba(255, 0, 255, 0.15);
+    opacity: 1;
+}
+.header-icon-btn.hidden {
+    display: none;
+}
+
 .section-content {
     display: flex;
     flex-direction: column;
@@ -175,7 +199,7 @@ input:checked+.slider:before {
 
 .word-list-container {
     min-height: 100px;
-    max-height: 200px;
+    max-height: 400px;
     overflow-y: auto;
     border: 1px solid rgba(255, 255, 255, 0.05);
     background: rgba(0, 0, 0, 0.2);
@@ -240,6 +264,24 @@ input:checked+.slider:before {
     top: 50%;
     left: 50%;
     transform: translate(-50%, -50%);
+}
+
+.word-speak-btn {
+    all: initial;
+    cursor: pointer;
+    font-size: 11px;
+    opacity: 0.5;
+    transition: all 0.2s ease;
+    flex-shrink: 0;
+    background: none;
+    border: none;
+    padding: 0 2px;
+    margin-right: auto;
+    filter: grayscale(1) brightness(10);
+}
+.word-speak-btn:hover {
+    opacity: 1;
+    transform: scale(1.3);
 }
 
 .word-content {

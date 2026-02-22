@@ -111,6 +111,7 @@ header {
   font-size: 0.85rem;
   margin-bottom: 8px;
   color: var(--neon-magenta);
+  text-shadow: 0 0 10px rgba(255, 0, 255, 0.5), 0 0 20px rgba(255, 0, 255, 0.3);
   font-family: 'Orbitron', sans-serif;
   letter-spacing: 0.5px;
   width: 100%;

@@ -2,6 +2,7 @@
 chrome-store-description.txt
 test-ligatures.html
 daspalecte-extension.zip
+daspalecte-*.zip
 
 # Dossier backend (à gérer séparément avec secrets)
 cloud-function/

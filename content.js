@@ -11,6 +11,13 @@ class DaspalecteTranslator {
         this.sidepanelVisible = false;
         this.toggleButton = null;
         this.translatorStateBeforeExercises = false; // Pour restaurer après exercices
+        this.sidepanelReady = false;
+        this.pendingMessages = [];
+        this.comprehensionTestMinimized = false;
+        this.comprehensionTestData = null;
+        this.comprehensionTestAnswers = { questions: [], matching: [] };
+        this.comprehensionTestPairMap = new Map();
+        this.studentEmail = '';
         this.init();
     }
 
@@ -28,6 +35,44 @@ class DaspalecteTranslator {
         if (this.isEnabled) {
             this.disableAllLinks();
         }
+
+        // Synchroniser l'état entre les onglets
+        chrome.storage.onChanged.addListener((changes, area) => {
+            if (area !== 'local') return;
+            try {
+                // Fermeture complète (bouton X) depuis un autre onglet
+                if (changes.extensionOpen && changes.extensionOpen.newValue === false) {
+                    if (this.toggleButton || this.sidepanelIframe) {
+                        this.closeExtension(true);
+                    }
+                    return;
+                }
+
+                // Replier / déplier la sidebar
+                if (changes.sidepanelVisible) {
+                    const isVisible = changes.sidepanelVisible.newValue;
+                    if (isVisible && !this.sidepanelVisible) {
+                        this.showExtension();
+                    } else if (!isVisible && this.sidepanelVisible) {
+                        this.hideSidepanel();
+                    }
+                }
+
+                // Activation / désactivation du traducteur (sync inter-onglets)
+                // Note : la compréhension n'est PAS synchronisée (activation manuelle par onglet)
+                if (changes.translatorEnabled) {
+                    const wasEnabled = this.isEnabled;
+                    this.isEnabled = changes.translatorEnabled.newValue;
+
+                    if (this.isEnabled && !wasEnabled) {
+                        this.disableAllLinks();
+                    } else if (!this.isEnabled && wasEnabled) {
+                        this.enableAllLinks();
+                        this.clearAllTranslations();
+                    }
+                }
+            } catch (e) { /* extension context invalidated */ }
+        });
 
         // Écouter les messages
         chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
@@ -77,6 +122,9 @@ class DaspalecteTranslator {
                 this.sendMessageToSidepanel(message);
             }
         });
+
+        // Restaurer l'état de la sidebar si elle était ouverte
+        this.restoreSidepanelState();
     }
 
     createToggleButton() {
@@ -144,11 +192,17 @@ class DaspalecteTranslator {
             container.classList.remove('daspalecte-hidden');
             container.classList.add('daspalecte-visible');
             this.sidepanelVisible = true;
-            
+
+            // Pousser le contenu de la page
+            document.documentElement.classList.add('daspalecte-page-pushed');
+
             // Déplacer l'onglet à gauche du panneau
             if (this.toggleButton) {
                 this.toggleButton.classList.add('panel-open');
             }
+
+            // Persister l'état pour les autres onglets
+            try { chrome.storage.local.set({ sidepanelVisible: true }); } catch (e) { /* extension context invalidated */ }
         }
     }
 
@@ -158,15 +212,21 @@ class DaspalecteTranslator {
             container.classList.remove('daspalecte-visible');
             container.classList.add('daspalecte-hidden');
             this.sidepanelVisible = false;
-            
+
+            // Remettre le contenu de la page en pleine largeur
+            document.documentElement.classList.remove('daspalecte-page-pushed');
+
             // Remettre l'onglet à l'extrémité droite
             if (this.toggleButton) {
                 this.toggleButton.classList.remove('panel-open');
             }
+
+            // Persister l'état pour les autres onglets
+            try { chrome.storage.local.set({ sidepanelVisible: false }); } catch (e) { /* extension context invalidated */ }
         }
     }
 
-    closeExtension() {
+    closeExtension(fromSync = false) {
         // 1. Désactiver tous les outils
         if (this.isEnabled) {
             this.clearAllTranslations();
@@ -179,18 +239,31 @@ class DaspalecteTranslator {
             this.isComprehensionEnabled = false;
         }
 
-        // 2. Fermer l'overlay d'exercices si ouvert (sans restaurer le traducteur)
-        this.translatorStateBeforeExercises = false; // Annuler la restauration
+        // 2. Fermer les overlays si ouverts
+        this.translatorStateBeforeExercises = false;
         this.closeExerciseOverlay();
+        this.closeComprehensionTestOverlay();
 
-        // 3. Mettre à jour le storage pour refléter l'état désactivé
-        chrome.storage.local.set({
-            translatorEnabled: false,
-            comprehensionEnabled: false
-        });
+        // 3. Mettre à jour le storage (seulement si action locale, pas sync)
+        if (!fromSync) {
+            try {
+                chrome.storage.local.set({
+                    translatorEnabled: false,
+                    comprehensionEnabled: false,
+                    extensionOpen: false,
+                    sidepanelVisible: false
+                });
+            } catch (e) { /* extension context invalidated */ }
+        }
 
-        // 4. Fermer le panneau
-        this.hideSidepanel();
+        // 4. Masquer la sidebar visuellement
+        const container = document.getElementById('daspalecte-sidepanel-container');
+        if (container) {
+            container.classList.remove('daspalecte-visible');
+            container.classList.add('daspalecte-hidden');
+        }
+        this.sidepanelVisible = false;
+        document.documentElement.classList.remove('daspalecte-page-pushed');
 
         // 5. SUPPRIMER complètement l'onglet du DOM
         if (this.toggleButton) {
@@ -204,24 +277,59 @@ class DaspalecteTranslator {
         if (!this.toggleButton) {
             this.createToggleButton();
         }
-        
+
         if (!this.sidepanelIframe) {
             this.createSidepanelIframe();
         }
-        
+
         // Afficher le panneau
         this.showSidepanel();
+
+        // Marquer l'extension comme ouverte (pour que la fermeture déclenche onChanged)
+        try { chrome.storage.local.set({ extensionOpen: true }); } catch (e) { /* extension context invalidated */ }
+    }
+
+    async restoreSidepanelState() {
+        try {
+            const result = await chrome.storage.local.get([
+                'sidepanelVisible', 'translatorEnabled'
+            ]);
+            if (result.sidepanelVisible) {
+                this.showExtension();
+
+                // Restaurer le traducteur (la compréhension reste manuelle par onglet)
+                if (result.translatorEnabled) {
+                    this.isEnabled = true;
+                    this.disableAllLinks();
+                }
+            }
+        } catch (e) { /* extension context invalidated */ }
     }
 
     sendMessageToSidepanel(message) {
-        if (this.sidepanelIframe && this.sidepanelIframe.contentWindow) {
+        if (!this.sidepanelIframe) return;
+        if (this.sidepanelReady && this.sidepanelIframe.contentWindow) {
             this.sidepanelIframe.contentWindow.postMessage(message, '*');
+        } else {
+            this.pendingMessages.push(message);
         }
     }
 
     handleSidepanelMessage(message) {
         // Gérer les messages venant du sidepanel iframe
         console.log('[CONTENT] 📨 Message reçu du sidepanel:', message.type);
+
+        if (message.type === 'SIDEPANEL_READY') {
+            this.sidepanelReady = true;
+            // Envoyer les messages en attente
+            this.pendingMessages.forEach(msg => {
+                if (this.sidepanelIframe && this.sidepanelIframe.contentWindow) {
+                    this.sidepanelIframe.contentWindow.postMessage(msg, '*');
+                }
+            });
+            this.pendingMessages = [];
+            return;
+        }
 
         if (message.type === 'CLOSE_EXTENSION') {
             // Le bouton X ferme complètement l'extension (panneau + onglet)
@@ -285,7 +393,21 @@ class DaspalecteTranslator {
             }
         } else if (message.type === 'GENERATE_EXERCISES') {
             this.handleExerciseGeneration(message.words, message.targetLanguage);
+        } else if (message.type === 'GENERATE_COMPREHENSION_TEST') {
+            this.handleComprehensionTest(message.nativeLanguage, message.studentEmail);
+        } else if (message.type === 'CLOSE_COMPREHENSION_TEST') {
+            this.closeComprehensionTestOverlay();
+        } else if (message.type === 'RESTORE_COMPREHENSION_TEST') {
+            this.restoreComprehensionTest();
         }
+    }
+
+    speakFrench(text) {
+        speechSynthesis.cancel();
+        const utterance = new SpeechSynthesisUtterance(text);
+        utterance.lang = 'fr-FR';
+        utterance.rate = 0.9;
+        speechSynthesis.speak(utterance);
     }
 
     async loadSettings() {
@@ -324,8 +446,9 @@ class DaspalecteTranslator {
         // Changer le curseur quand le traducteur est activé
         document.addEventListener('mouseover', (e) => {
             if (this.isEnabled && e.target.nodeType === Node.ELEMENT_NODE) {
-                // Ne pas changer le curseur sur les liens
-                if (e.target.tagName !== 'A' && !e.target.closest('a')) {
+                // Ne pas changer le curseur sur les liens ni sur le bouton speaker
+                if (e.target.tagName !== 'A' && !e.target.closest('a') &&
+                    !e.target.classList.contains('daspalecte-speak-btn')) {
                     e.target.style.cursor = 'help';
                 }
             }
@@ -341,6 +464,14 @@ class DaspalecteTranslator {
             if (!this.isEnabled) return;
 
             const target = e.target;
+
+            // Si on clique sur le bouton speaker
+            if (target.classList.contains('daspalecte-speak-btn')) {
+                e.preventDefault();
+                e.stopPropagation();
+                this.speakFrench(target.dataset.word);
+                return;
+            }
 
             // Si on clique sur une traduction
             if (target.classList.contains('daspalecte-translation')) {
@@ -1040,6 +1171,554 @@ class DaspalecteTranslator {
         };
     }
 
+    // ========================================
+    // COMPREHENSION TEST (Test de lecture)
+    // ========================================
+
+    extractPageText() {
+        // Try article, main, [role="main"] first, fallback to body
+        const candidates = [
+            document.querySelector('article'),
+            document.querySelector('main'),
+            document.querySelector('[role="main"]'),
+            document.body
+        ];
+        let container = candidates.find(el => el && el.textContent.trim().length > 100) || document.body;
+
+        console.log('[CONTENT] 📄 extractPageText - container:', container.tagName, 'textContent length:', container.textContent.length);
+
+        // Clone to filter out only daspalecte UI elements (not page content)
+        const clone = container.cloneNode(true);
+        clone.querySelectorAll('#daspalecte-sidepanel-container, #daspalecte-toggle-btn, #daspalecte-exercise-overlay, #daspalecte-comprehension-test-overlay, #daspalecte-ct-floating-btn').forEach(el => el.remove());
+
+        let text = clone.textContent || '';
+        // Clean up whitespace
+        text = text.replace(/\s+/g, ' ').trim();
+
+        console.log('[CONTENT] 📄 extractPageText - cleaned text length:', text.length);
+
+        // Truncate to 5000 chars
+        if (text.length > 5000) {
+            text = text.substring(0, 5000);
+        }
+        return text;
+    }
+
+    async handleComprehensionTest(nativeLanguage, studentEmail) {
+        this.studentEmail = studentEmail || 'unknown@student';
+
+        const pageText = this.extractPageText();
+        if (pageText.length < 100) {
+            alert('Le texte de cette page est trop court pour générer un test de lecture.');
+            this.sendMessageToSidepanel({ type: 'COMPREHENSION_TEST_CLOSED' });
+            return;
+        }
+
+        // Show loader overlay
+        this.showComprehensionTestLoader();
+
+        try {
+            const response = await fetch('https://daspalecte-1086562672385.europe-west1.run.app', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    action: 'generate_comprehension_test',
+                    text: pageText,
+                    nativeLanguage: nativeLanguage || this.nativeLanguage
+                })
+            });
+
+            if (!response.ok) {
+                const errorData = await response.json();
+                console.error('[CONTENT] Erreur backend test:', errorData);
+                throw new Error('Erreur lors de la génération du test');
+            }
+
+            const data = await response.json();
+            this.comprehensionTestData = data;
+            this.comprehensionTestAnswers = {
+                questions: new Array(data.questions ? data.questions.length : 0).fill(null),
+                matching: []
+            };
+            this.displayComprehensionTest(data);
+        } catch (error) {
+            console.error('Erreur test de lecture:', error);
+            alert('Erreur lors de la préparation du test de lecture.');
+            this.closeComprehensionTestOverlay();
+        }
+    }
+
+    showComprehensionTestLoader() {
+        // Clean up existing overlay WITHOUT sending close message to sidepanel
+        const existing = document.getElementById('daspalecte-comprehension-test-overlay');
+        if (existing) existing.remove();
+        const existingBtn = document.getElementById('daspalecte-ct-floating-btn');
+        if (existingBtn) existingBtn.remove();
+
+        const overlay = document.createElement('div');
+        overlay.id = 'daspalecte-comprehension-test-overlay';
+        overlay.innerHTML = `
+            <div class="ct-overlay-content ct-loader-active">
+                <div class="loader-container">
+                    <div class="neon-spinner"></div>
+                    <p style="color: #aaa; font-family: Inter, sans-serif;">Claude prépare votre test de lecture...</p>
+                </div>
+                <button class="ct-close-btn" title="Fermer">×</button>
+            </div>
+        `;
+        document.body.appendChild(overlay);
+        overlay.querySelector('.ct-close-btn').onclick = () => this.closeComprehensionTestOverlay();
+    }
+
+    displayComprehensionTest(data) {
+        const overlay = document.getElementById('daspalecte-comprehension-test-overlay');
+        if (!overlay) return;
+
+        const content = overlay.querySelector('.ct-overlay-content');
+        content.classList.remove('ct-loader-active');
+
+        let currentPage = 1;
+
+        content.innerHTML = `
+            <div class="ct-container">
+                <div class="ct-header">
+                    <div>
+                        <h2 class="ct-title">Test de lecture</h2>
+                        <span class="ct-step-indicator" id="ct-step-indicator">1 / 2</span>
+                    </div>
+                    <div class="ct-header-actions">
+                        <button id="ct-minimize-btn" class="ct-minimize-btn" title="Minimiser">−</button>
+                        <button id="ct-close-btn" class="ct-close-btn" title="Fermer">×</button>
+                    </div>
+                </div>
+                <div class="ct-body">
+                    <div class="ct-page" id="ct-page-1">
+                        <div class="ct-section">
+                            <h3 class="ct-section-title">Questions de compréhension</h3>
+                            <div id="ct-mcq-container"></div>
+                        </div>
+                    </div>
+                    <div class="ct-page" id="ct-page-2" style="display:none">
+                        <div class="ct-section">
+                            <h3 class="ct-section-title">Exercice d'appariement</h3>
+                            <div id="ct-matching-container"></div>
+                        </div>
+                    </div>
+                </div>
+                <div class="ct-footer">
+                    <div class="ct-nav">
+                        <button class="ex-btn secondary" id="ct-prev-btn" style="display:none">← Précédent</button>
+                        <button class="ex-btn primary" id="ct-next-btn">Suivant →</button>
+                        <button class="ex-btn primary" id="ct-submit-btn" style="display:none">Soumettre le test</button>
+                    </div>
+                </div>
+            </div>
+        `;
+
+        const page1 = content.querySelector('#ct-page-1');
+        const page2 = content.querySelector('#ct-page-2');
+        const prevBtn = content.querySelector('#ct-prev-btn');
+        const nextBtn = content.querySelector('#ct-next-btn');
+        const submitBtn = content.querySelector('#ct-submit-btn');
+        const stepIndicator = content.querySelector('#ct-step-indicator');
+
+        const showPage = (page) => {
+            currentPage = page;
+            stepIndicator.textContent = `${page} / 2`;
+            page1.style.display = page === 1 ? 'block' : 'none';
+            page2.style.display = page === 2 ? 'block' : 'none';
+            prevBtn.style.display = page === 2 ? 'inline-block' : 'none';
+            nextBtn.style.display = page === 1 ? 'inline-block' : 'none';
+            submitBtn.style.display = page === 2 ? 'inline-block' : 'none';
+            // Scroll to top of overlay
+            overlay.scrollTop = 0;
+        };
+
+        nextBtn.onclick = () => showPage(2);
+        prevBtn.onclick = () => showPage(1);
+
+        // Render MCQ questions
+        if (data.questions && data.questions.length > 0) {
+            this.renderMCQQuestions(data.questions, content.querySelector('#ct-mcq-container'));
+        }
+
+        // Render matching exercise
+        if (data.matching && data.matching.pairs && data.matching.pairs.length > 0) {
+            this.renderTestMatchingExercise(data.matching, content.querySelector('#ct-matching-container'));
+        }
+
+        // Event listeners — use getElementById from document (overlay is in body)
+        document.getElementById('ct-close-btn').addEventListener('click', (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            this.closeComprehensionTestOverlay();
+        });
+        document.getElementById('ct-minimize-btn').addEventListener('click', (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            console.log('[CONTENT] 📝 Minimize clicked');
+            this.minimizeComprehensionTest();
+        });
+        submitBtn.addEventListener('click', (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            this.submitComprehensionTest(data);
+        });
+    }
+
+    renderMCQQuestions(questions, container) {
+        questions.forEach((q, qIdx) => {
+            const questionDiv = document.createElement('div');
+            questionDiv.className = 'ct-question';
+            questionDiv.dataset.idx = qIdx;
+
+            let optionsHTML = '';
+            q.options.forEach((opt, oIdx) => {
+                optionsHTML += `
+                    <label class="ct-option">
+                        <input type="radio" name="ct-q-${qIdx}" value="${oIdx}" class="ct-radio">
+                        <span class="ct-option-text">${opt}</span>
+                    </label>
+                `;
+            });
+
+            questionDiv.innerHTML = `
+                <div class="ct-question-header">
+                    <span class="ct-question-number">${qIdx + 1}</span>
+                    <span class="ct-question-text">${q.question}</span>
+                </div>
+                <div class="ct-options">${optionsHTML}</div>
+            `;
+
+            // Listen for radio changes
+            questionDiv.querySelectorAll('.ct-radio').forEach(radio => {
+                radio.addEventListener('change', () => {
+                    this.comprehensionTestAnswers.questions[qIdx] = parseInt(radio.value);
+                });
+            });
+
+            container.appendChild(questionDiv);
+        });
+    }
+
+    renderTestMatchingExercise(matchingData, container) {
+        let selectedFrEl = null;
+        let selectedTrEl = null;
+        const pairs = matchingData.pairs;
+
+        // Distinct colors for each pair
+        const pairColors = ['#00f3ff', '#ff00ff', '#ffa500', '#32cd32', '#ff6b6b', '#9b59b6', '#f1c40f', '#1abc9c'];
+        let colorIndex = 0;
+
+        // Map to track pairings: element -> partner element
+        // Also store color per element
+        this.comprehensionTestPairMap = new Map();
+        const pairMap = this.comprehensionTestPairMap;
+        const pairColorMap = new Map(); // element -> color
+
+        container.innerHTML = `
+            <div class="matching-container" style="position: relative !important;">
+                <div class="matching-col" id="ct-col-fr"></div>
+                <svg id="ct-matching-svg" style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; z-index: 1;"></svg>
+                <div class="matching-col" id="ct-col-tr"></div>
+            </div>
+        `;
+
+        const colFr = container.querySelector('#ct-col-fr');
+        const colTr = container.querySelector('#ct-col-tr');
+        const matchingContainer = container.querySelector('.matching-container');
+        const svg = container.querySelector('#ct-matching-svg');
+
+        // Shuffle arrays
+        const frItems = [...pairs].sort(() => Math.random() - 0.5);
+        const trItems = [...pairs].sort(() => Math.random() - 0.5);
+
+        const drawLines = () => {
+            svg.innerHTML = '';
+            const containerRect = matchingContainer.getBoundingClientRect();
+            const processed = new Set();
+
+            pairMap.forEach((partner, el) => {
+                if (processed.has(el)) return;
+                processed.add(el);
+                processed.add(partner);
+
+                const frEl = colFr.contains(el) ? el : partner;
+                const trEl = colFr.contains(el) ? partner : el;
+
+                const frRect = frEl.getBoundingClientRect();
+                const trRect = trEl.getBoundingClientRect();
+                const color = pairColorMap.get(frEl) || '#00f3ff';
+
+                const x1 = frRect.right - containerRect.left;
+                const y1 = frRect.top + frRect.height / 2 - containerRect.top;
+                const x2 = trRect.left - containerRect.left;
+                const y2 = trRect.top + trRect.height / 2 - containerRect.top;
+
+                const line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+                line.setAttribute('x1', x1);
+                line.setAttribute('y1', y1);
+                line.setAttribute('x2', x2);
+                line.setAttribute('y2', y2);
+                line.setAttribute('stroke', color);
+                line.setAttribute('stroke-width', '2');
+                line.setAttribute('opacity', '0.8');
+                svg.appendChild(line);
+            });
+        };
+
+        const applyPairStyle = (el, color) => {
+            el.style.setProperty('border-color', color, 'important');
+            el.style.setProperty('color', color, 'important');
+            el.style.setProperty('background', `${color}15`, 'important');
+            el.classList.add('ct-paired');
+        };
+
+        const clearPairStyle = (el) => {
+            el.style.removeProperty('border-color');
+            el.style.removeProperty('color');
+            el.style.removeProperty('background');
+            el.classList.remove('ct-paired');
+            pairColorMap.delete(el);
+        };
+
+        const tryFormPair = () => {
+            if (selectedFrEl && selectedTrEl) {
+                const color = pairColors[colorIndex % pairColors.length];
+                colorIndex++;
+                selectedFrEl.classList.remove('selected');
+                selectedTrEl.classList.remove('selected');
+                applyPairStyle(selectedFrEl, color);
+                applyPairStyle(selectedTrEl, color);
+                pairColorMap.set(selectedFrEl, color);
+                pairColorMap.set(selectedTrEl, color);
+                pairMap.set(selectedFrEl, selectedTrEl);
+                pairMap.set(selectedTrEl, selectedFrEl);
+                selectedFrEl = null;
+                selectedTrEl = null;
+                drawLines();
+            }
+        };
+
+        const unpair = (el) => {
+            const partner = pairMap.get(el);
+            if (partner) {
+                clearPairStyle(el);
+                clearPairStyle(partner);
+                pairMap.delete(el);
+                pairMap.delete(partner);
+                drawLines();
+            }
+        };
+
+        frItems.forEach(pair => {
+            const el = document.createElement('div');
+            el.className = 'match-item';
+            el.textContent = pair.fr;
+            el.dataset.val = pair.fr;
+            el.addEventListener('click', (e) => {
+                e.stopPropagation();
+                if (el.classList.contains('ct-paired')) {
+                    unpair(el);
+                    return;
+                }
+                if (selectedFrEl) selectedFrEl.classList.remove('selected');
+                el.classList.add('selected');
+                selectedFrEl = el;
+                tryFormPair();
+            });
+            colFr.appendChild(el);
+        });
+
+        trItems.forEach(pair => {
+            const el = document.createElement('div');
+            el.className = 'match-item';
+            el.textContent = pair.tr;
+            el.dataset.val = pair.fr;
+            el.addEventListener('click', (e) => {
+                e.stopPropagation();
+                if (el.classList.contains('ct-paired')) {
+                    unpair(el);
+                    return;
+                }
+                if (selectedTrEl) selectedTrEl.classList.remove('selected');
+                el.classList.add('selected');
+                selectedTrEl = el;
+                tryFormPair();
+            });
+            colTr.appendChild(el);
+        });
+    }
+
+    submitComprehensionTest(testData) {
+        const answers = this.comprehensionTestAnswers;
+
+        // Calculate MCQ score (unanswered = wrong)
+        let mcqCorrect = 0;
+        const mcqTotal = testData.questions.length;
+        testData.questions.forEach((q, idx) => {
+            if (answers.questions[idx] === q.correct) {
+                mcqCorrect++;
+            }
+        });
+
+        // Calculate matching score from pairMap
+        const pairMap = this.comprehensionTestPairMap || new Map();
+        const totalPairs = testData.matching ? testData.matching.pairs.length : 0;
+        let matchingCorrect = 0;
+        const processed = new Set();
+
+        pairMap.forEach((partner, el) => {
+            if (processed.has(el)) return;
+            processed.add(el);
+            processed.add(partner);
+
+            // Determine which is FR col and which is TR col
+            const overlay = document.getElementById('daspalecte-comprehension-test-overlay');
+            const colFr = overlay ? overlay.querySelector('#ct-col-fr') : null;
+            if (!colFr) return;
+
+            const frEl = colFr.contains(el) ? el : partner;
+            const trEl = colFr.contains(el) ? partner : el;
+
+            if (frEl.dataset.val === trEl.dataset.val) {
+                frEl.classList.add('ct-correct');
+                trEl.classList.add('ct-correct');
+                matchingCorrect++;
+            } else {
+                frEl.classList.add('ct-incorrect');
+                trEl.classList.add('ct-incorrect');
+            }
+        });
+
+        // Mark unpaired items as incorrect
+        const overlay = document.getElementById('daspalecte-comprehension-test-overlay');
+        if (overlay) {
+            overlay.querySelectorAll('#ct-col-fr .match-item, #ct-col-tr .match-item').forEach(el => {
+                if (!el.classList.contains('ct-correct') && !el.classList.contains('ct-incorrect')) {
+                    el.classList.add('ct-incorrect');
+                }
+            });
+        }
+
+        const totalScore = mcqCorrect + matchingCorrect;
+        const totalMax = mcqTotal + totalPairs;
+        const percentage = totalMax > 0 ? Math.round((totalScore / totalMax) * 100) : 0;
+
+        // Visual feedback on MCQ questions
+        if (overlay) {
+            // Show page 1 for MCQ feedback
+            const page1 = overlay.querySelector('#ct-page-1');
+            const page2 = overlay.querySelector('#ct-page-2');
+            if (page1) page1.style.display = 'block';
+            if (page2) page2.style.display = 'block';
+
+            // Hide step indicator and nav
+            const stepIndicator = overlay.querySelector('#ct-step-indicator');
+            if (stepIndicator) stepIndicator.textContent = 'Résultats';
+            const nav = overlay.querySelector('.ct-nav');
+            if (nav) nav.style.display = 'none';
+
+            testData.questions.forEach((q, idx) => {
+                const questionDiv = overlay.querySelector(`.ct-question[data-idx="${idx}"]`);
+                if (!questionDiv) return;
+
+                const options = questionDiv.querySelectorAll('.ct-option');
+                options.forEach((opt, oIdx) => {
+                    if (oIdx === q.correct) {
+                        opt.classList.add('ct-correct');
+                    } else if (oIdx === answers.questions[idx] && oIdx !== q.correct) {
+                        opt.classList.add('ct-incorrect');
+                    }
+                });
+
+                // Disable radio buttons
+                questionDiv.querySelectorAll('.ct-radio').forEach(r => r.disabled = true);
+            });
+
+            // Show results in footer
+            const footer = overlay.querySelector('.ct-footer');
+            if (footer) {
+                const resultsDiv = document.createElement('div');
+                resultsDiv.className = 'ct-results';
+                resultsDiv.innerHTML = `
+                    <div class="ct-score-display">
+                        <div class="ct-score-circle ${percentage >= 70 ? 'ct-score-good' : percentage >= 50 ? 'ct-score-ok' : 'ct-score-bad'}">
+                            <span class="ct-score-number">${percentage}%</span>
+                        </div>
+                        <div class="ct-score-details">
+                            <p>QCM : ${mcqCorrect} / ${mcqTotal}</p>
+                            <p>Appariement : ${matchingCorrect} / ${totalPairs}</p>
+                            <p class="ct-score-total">Total : ${totalScore} / ${totalMax}</p>
+                        </div>
+                    </div>
+                    <button class="ex-btn primary" id="ct-close-results-btn">Fermer le test</button>
+                `;
+                footer.appendChild(resultsDiv);
+                footer.querySelector('#ct-close-results-btn').onclick = () => this.closeComprehensionTestOverlay();
+            }
+        }
+
+        // Send score via Cloud Function
+        console.log('[CONTENT] 📧 Envoi du score au professeur...', { mcqCorrect, mcqTotal, matchingCorrect, totalPairs, percentage });
+        this.sendScoreToTeacher(mcqCorrect, mcqTotal, matchingCorrect, totalPairs, percentage);
+    }
+
+    async sendScoreToTeacher(mcqCorrect, mcqTotal, matchingScore, matchingTotal, percentage) {
+        try {
+            await fetch('https://script.google.com/macros/s/AKfycbw-kVeRoxGDjnqy6AoGp3gA8rp68IOCj6_qBwPWURYMoIh15gVCzLrvAx6Wrkv9DJxu8Q/exec', {
+                method: 'POST',
+                headers: { 'Content-Type': 'text/plain' },
+                body: JSON.stringify({
+                    studentEmail: this.studentEmail,
+                    mcqScore: mcqCorrect,
+                    mcqTotal: mcqTotal,
+                    matchingScore: matchingScore,
+                    matchingTotal: matchingTotal,
+                    percentage: percentage,
+                    pageUrl: window.location.href,
+                    pageTitle: document.title
+                })
+            });
+            console.log('[CONTENT] ✅ Score envoyé vers Google Sheets');
+        } catch (error) {
+            console.error('[CONTENT] ❌ Erreur envoi score:', error);
+        }
+    }
+
+    minimizeComprehensionTest() {
+        const overlay = document.getElementById('daspalecte-comprehension-test-overlay');
+        if (overlay) {
+            overlay.style.setProperty('display', 'none', 'important');
+            this.comprehensionTestMinimized = true;
+            // Notify sidepanel to show restore button
+            this.sendMessageToSidepanel({ type: 'COMPREHENSION_TEST_MINIMIZED' });
+        }
+    }
+
+    restoreComprehensionTest() {
+        const overlay = document.getElementById('daspalecte-comprehension-test-overlay');
+        if (overlay) {
+            overlay.style.setProperty('display', 'flex', 'important');
+            this.comprehensionTestMinimized = false;
+            // Notify sidepanel to hide restore button
+            this.sendMessageToSidepanel({ type: 'COMPREHENSION_TEST_RESTORED' });
+        }
+    }
+
+    closeComprehensionTestOverlay() {
+        const overlay = document.getElementById('daspalecte-comprehension-test-overlay');
+        if (overlay) overlay.remove();
+
+        this.comprehensionTestMinimized = false;
+        this.comprehensionTestData = null;
+        this.comprehensionTestAnswers = { questions: [], matching: [] };
+        this.comprehensionTestPairMap = new Map();
+
+        // Notify sidepanel to reset toggle and hide restore button
+        this.sendMessageToSidepanel({ type: 'COMPREHENSION_TEST_CLOSED' });
+    }
+
     disableAllLinks() {
         const links = document.querySelectorAll('a');
         links.forEach(link => {
@@ -1237,7 +1916,18 @@ class DaspalecteTranslator {
 
             const translationElement = document.createElement('div');
             translationElement.className = 'daspalecte-translation';
-            translationElement.textContent = translation;
+
+            const translationText = document.createElement('span');
+            translationText.className = 'daspalecte-translation-text';
+            translationText.textContent = translation;
+
+            const speakBtn = document.createElement('span');
+            speakBtn.className = 'daspalecte-speak-btn';
+            speakBtn.textContent = '\u{1F50A}';
+            speakBtn.dataset.word = text;
+
+            translationElement.appendChild(translationText);
+            translationElement.appendChild(speakBtn);
 
             wordElement.appendChild(translationElement);
             wordElement.classList.add('selected');
