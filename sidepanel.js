@@ -7,6 +7,7 @@ const comprehensionToggle = document.getElementById('comprehension-toggle');
 const readingTestToggle = document.getElementById('reading-test-toggle');
 const ctRestoreContainer = document.getElementById('ct-restore-container');
 const ctRestoreBtn = document.getElementById('ct-restore-btn');
+const captureBtn = document.getElementById('capture-btn');
 const closePanelBtn = document.getElementById('close-panel-btn');
 
 function speakFrench(text) {
@@ -359,6 +360,14 @@ document.getElementById('gen-exercises').addEventListener('click', () => {
         type: 'GENERATE_EXERCISES',
         words: selectedWords,
         targetLanguage: nativeLanguage
+    });
+});
+
+// Capture & Lecture button
+captureBtn.addEventListener('click', () => {
+    sendToContentScript({
+        type: 'START_SCREEN_CAPTURE',
+        nativeLanguage: nativeLanguage
     });
 });
 

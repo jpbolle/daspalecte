@@ -90,10 +90,10 @@
 <body>
     <div class="container">
         <h1>Politique de Confidentialité</h1>
-        <p class="date">Dernière mise à jour : 11 janvier 2026</p>
+        <p class="date">Dernière mise à jour : 22 février 2026</p>
 
         <div class="highlight">
-            <p><strong>En résumé :</strong> Daspalecte respecte votre vie privée. Vos données de vocabulaire sont stockées uniquement sur votre ordinateur. Les textes que vous traduisez ou simplifiez sont traités de manière sécurisée et ne sont pas conservés.</p>
+            <p><strong>En résumé :</strong> Daspalecte respecte votre vie privée. Vos données de vocabulaire sont stockées uniquement sur votre ordinateur. Les textes que vous traduisez ou simplifiez sont traités de manière sécurisée et ne sont pas conservés. Lorsque vous passez un test de lecture, votre adresse email Google et votre score sont transmis à votre enseignant via une feuille de calcul sécurisée.</p>
         </div>
 
         <h2>1. Introduction</h2>
@@ -122,18 +122,30 @@
             <li><strong>Mots individuels</strong> pour traduction (ex : "maison")</li>
             <li><strong>Paragraphes de texte</strong> pour simplification (uniquement quand vous cliquez sur le bouton ✨)</li>
             <li><strong>Liste de mots sélectionnés</strong> pour génération d'exercices</li>
+            <li><strong>Extraits de texte de la page</strong> pour génération de tests de lecture (uniquement quand vous activez le test)</li>
         </ul>
 
         <div class="highlight">
             <p><strong>Important :</strong> Ces données sont traitées <strong>en temps réel</strong> et <strong>ne sont pas conservées</strong> sur nos serveurs après traitement. Aucun historique n'est enregistré.</p>
         </div>
 
-        <h3>2.3 Données que nous ne collectons PAS</h3>
+        <h3>2.3 Données collectées lors du test de lecture</h3>
+        <p>Lorsqu'un élève passe un <strong>test de lecture</strong> et soumet ses réponses, les données suivantes sont enregistrées dans une feuille de calcul Google Sheets gérée par l'enseignant :</p>
         <ul>
-            <li>❌ Votre identité (nom, email, adresse)</li>
+            <li><strong>Adresse email Google</strong> de l'élève (récupérée automatiquement via le compte Chrome/Chromebook)</li>
+            <li><strong>Score obtenu</strong> (QCM et appariement)</li>
+            <li><strong>URL et titre de la page</strong> sur laquelle le test a été passé</li>
+            <li><strong>Date et heure</strong> de soumission</li>
+        </ul>
+        <div class="highlight">
+            <p><strong>Finalité :</strong> Ces données sont collectées <strong>uniquement à des fins pédagogiques</strong> pour permettre à l'enseignant de suivre les progrès de ses élèves. Elles ne sont accessibles qu'à l'enseignant responsable et ne sont partagées avec aucun tiers.</p>
+        </div>
+
+        <h3>2.4 Données que nous ne collectons PAS</h3>
+        <ul>
+            <li>❌ Votre identité (nom, adresse postale)</li>
             <li>❌ Votre historique de navigation</li>
-            <li>❌ Les URLs des pages que vous visitez</li>
-            <li>❌ Vos informations personnelles ou sensibles</li>
+            <li>❌ Vos informations financières ou sensibles</li>
             <li>❌ Cookies de suivi ou analytics</li>
         </ul>
 
@@ -193,7 +205,7 @@
         <ul>
             <li><strong>Connexions HTTPS</strong> : Toutes les communications avec notre backend sont chiffrées</li>
             <li><strong>Google Secret Manager</strong> : Les clés API sont stockées de manière sécurisée</li>
-            <li><strong>Pas de base de données</strong> : Aucune base de données permanente côté serveur</li>
+            <li><strong>Google Sheets sécurisé</strong> : Les scores des tests de lecture sont enregistrés dans une feuille de calcul accessible uniquement par l'enseignant</li>
             <li><strong>Stockage local uniquement</strong> : Vos listes de vocabulaire restent sur votre appareil</li>
         </ul>
 
@@ -219,8 +231,8 @@
         <p>Daspalecte demande les permissions Chrome suivantes :</p>
         <ul>
             <li><strong>storage</strong> : Pour sauvegarder votre vocabulaire et préférences localement</li>
-            <li><strong>scripting</strong> : Pour injecter les fonctionnalités de traduction sur les pages web</li>
             <li><strong>activeTab</strong> : Pour accéder au contenu de la page active (uniquement quand vous utilisez l'extension)</li>
+            <li><strong>identity</strong> : Pour récupérer l'adresse email du compte Google de l'élève lors de la soumission d'un test de lecture</li>
             <li><strong>host_permissions (&lt;all_urls&gt;)</strong> : Pour permettre l'utilisation sur tous les sites web que vous visitez</li>
         </ul>
 
@@ -228,8 +240,8 @@
 
         <h2>8. Utilisateurs mineurs</h2>
 
-        <p>Daspalecte est conçu pour les élèves, y compris les mineurs. Nous ne collectons <strong>aucune information personnelle identifiable</strong> des utilisateurs, quel que soit leur âge.</p>
-        <p>Les enseignants et parents peuvent utiliser l'extension avec leurs élèves en toute sécurité.</p>
+        <p>Daspalecte est conçu pour les élèves, y compris les mineurs. La seule donnée personnelle identifiable collectée est l'<strong>adresse email Google</strong> de l'élève, uniquement lors de la soumission d'un test de lecture, et uniquement à des fins de suivi pédagogique par l'enseignant.</p>
+        <p>Les enseignants et parents peuvent utiliser l'extension avec leurs élèves en toute sécurité. L'utilisation du test de lecture suppose le consentement de l'établissement scolaire et des parents/tuteurs légaux.</p>
 
         <h2>9. Modifications de cette politique</h2>
 

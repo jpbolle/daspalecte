@@ -399,6 +399,8 @@ class DaspalecteTranslator {
             this.closeComprehensionTestOverlay();
         } else if (message.type === 'RESTORE_COMPREHENSION_TEST') {
             this.restoreComprehensionTest();
+        } else if (message.type === 'START_SCREEN_CAPTURE') {
+            this.startScreenCapture(message.nativeLanguage);
         }
     }
 
@@ -461,17 +463,17 @@ class DaspalecteTranslator {
         });
 
         document.addEventListener('click', (e) => {
-            if (!this.isEnabled) return;
-
             const target = e.target;
 
-            // Si on clique sur le bouton speaker
-            if (target.classList.contains('daspalecte-speak-btn')) {
+            // Speaker buttons work regardless of translator state
+            if (target.classList.contains('daspalecte-speak-btn') || target.classList.contains('capture-speak-btn')) {
                 e.preventDefault();
                 e.stopPropagation();
                 this.speakFrench(target.dataset.word);
                 return;
             }
+
+            if (!this.isEnabled) return;
 
             // Si on clique sur une traduction
             if (target.classList.contains('daspalecte-translation')) {
@@ -1189,7 +1191,7 @@ class DaspalecteTranslator {
 
         // Clone to filter out only daspalecte UI elements (not page content)
         const clone = container.cloneNode(true);
-        clone.querySelectorAll('#daspalecte-sidepanel-container, #daspalecte-toggle-btn, #daspalecte-exercise-overlay, #daspalecte-comprehension-test-overlay, #daspalecte-ct-floating-btn').forEach(el => el.remove());
+        clone.querySelectorAll('#daspalecte-sidepanel-container, #daspalecte-toggle-btn, #daspalecte-exercise-overlay, #daspalecte-comprehension-test-overlay, #daspalecte-ct-floating-btn, #daspalecte-capture-overlay, #daspalecte-capture-result-overlay').forEach(el => el.remove());
 
         let text = clone.textContent || '';
         // Clean up whitespace
@@ -1704,6 +1706,398 @@ class DaspalecteTranslator {
             // Notify sidepanel to hide restore button
             this.sendMessageToSidepanel({ type: 'COMPREHENSION_TEST_RESTORED' });
         }
+    }
+
+    // ========================================
+    // CAPTURE & LECTURE (Screenshot OCR)
+    // ========================================
+
+    startScreenCapture(nativeLanguage) {
+        if (nativeLanguage) this.nativeLanguage = nativeLanguage;
+
+        // Save UI state for restoration
+        const uiState = {
+            sidepanelVisible: this.sidepanelVisible,
+            toggleButtonVisible: this.toggleButton && this.toggleButton.style.display !== 'none'
+        };
+
+        // Hide sidepanel and toggle button so they don't appear in screenshot
+        if (this.sidepanelVisible) {
+            const container = document.getElementById('daspalecte-sidepanel-container');
+            if (container) container.style.setProperty('display', 'none', 'important');
+        }
+        if (this.toggleButton) {
+            this.toggleButton.style.setProperty('display', 'none', 'important');
+        }
+        document.documentElement.classList.remove('daspalecte-page-pushed');
+
+        // Create selection overlay
+        const overlay = document.createElement('div');
+        overlay.id = 'daspalecte-capture-overlay';
+
+        const instructions = document.createElement('div');
+        instructions.className = 'capture-instructions';
+        instructions.textContent = 'Dessinez un rectangle sur la zone à capturer — Échap pour annuler';
+        overlay.appendChild(instructions);
+
+        document.body.appendChild(overlay);
+
+        let isDrawing = false;
+        let startX, startY;
+        let selectionRect = null;
+
+        const onMouseDown = (e) => {
+            if (e.target.closest('.capture-action-buttons')) return;
+            isDrawing = true;
+            startX = e.clientX;
+            startY = e.clientY;
+
+            // Remove previous selection rect and buttons
+            const existingRect = document.getElementById('daspalecte-selection-rect');
+            if (existingRect) existingRect.remove();
+            const existingBtns = overlay.querySelector('.capture-action-buttons');
+            if (existingBtns) existingBtns.remove();
+
+            selectionRect = document.createElement('div');
+            selectionRect.id = 'daspalecte-selection-rect';
+            document.body.appendChild(selectionRect);
+        };
+
+        const onMouseMove = (e) => {
+            if (!isDrawing || !selectionRect) return;
+            const x = Math.min(e.clientX, startX);
+            const y = Math.min(e.clientY, startY);
+            const w = Math.abs(e.clientX - startX);
+            const h = Math.abs(e.clientY - startY);
+
+            selectionRect.style.setProperty('left', x + 'px', 'important');
+            selectionRect.style.setProperty('top', y + 'px', 'important');
+            selectionRect.style.setProperty('width', w + 'px', 'important');
+            selectionRect.style.setProperty('height', h + 'px', 'important');
+        };
+
+        const onMouseUp = (e) => {
+            if (!isDrawing) return;
+            isDrawing = false;
+
+            const rect = {
+                x: Math.min(e.clientX, startX),
+                y: Math.min(e.clientY, startY),
+                width: Math.abs(e.clientX - startX),
+                height: Math.abs(e.clientY - startY)
+            };
+
+            // Minimum size check
+            if (rect.width < 20 || rect.height < 20) {
+                if (selectionRect) selectionRect.remove();
+                return;
+            }
+
+            this.showCaptureConfirmation(overlay, selectionRect, rect, uiState);
+        };
+
+        const onKeyDown = (e) => {
+            if (e.key === 'Escape') {
+                this.cancelCapture(overlay, uiState);
+                cleanup();
+            }
+        };
+
+        const cleanup = () => {
+            overlay.removeEventListener('mousedown', onMouseDown);
+            overlay.removeEventListener('mousemove', onMouseMove);
+            overlay.removeEventListener('mouseup', onMouseUp);
+            document.removeEventListener('keydown', onKeyDown);
+        };
+
+        overlay.addEventListener('mousedown', onMouseDown);
+        overlay.addEventListener('mousemove', onMouseMove);
+        overlay.addEventListener('mouseup', onMouseUp);
+        document.addEventListener('keydown', onKeyDown);
+
+        // Store cleanup for external cancel
+        overlay._cleanup = cleanup;
+    }
+
+    showCaptureConfirmation(overlay, selectionRect, rect, uiState) {
+        // Position buttons below the selection
+        const btnsContainer = document.createElement('div');
+        btnsContainer.className = 'capture-action-buttons';
+        btnsContainer.style.setProperty('left', rect.x + 'px', 'important');
+        btnsContainer.style.setProperty('top', (rect.y + rect.height + 10) + 'px', 'important');
+
+        const confirmBtn = document.createElement('button');
+        confirmBtn.className = 'capture-confirm-btn';
+        confirmBtn.textContent = '📷 Capturer';
+
+        const cancelBtn = document.createElement('button');
+        cancelBtn.className = 'capture-cancel-btn';
+        cancelBtn.textContent = 'Annuler';
+
+        btnsContainer.appendChild(confirmBtn);
+        btnsContainer.appendChild(cancelBtn);
+        overlay.appendChild(btnsContainer);
+
+        confirmBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            if (overlay._cleanup) overlay._cleanup();
+            this.executeCapture(selectionRect, overlay, rect, uiState);
+        });
+
+        cancelBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            if (overlay._cleanup) overlay._cleanup();
+            this.cancelCapture(overlay, uiState);
+        });
+    }
+
+    async executeCapture(selectionRect, overlay, rect, uiState) {
+        // Remove selection UI
+        if (selectionRect) selectionRect.remove();
+        if (overlay) overlay.remove();
+
+        // Wait for UI to clear before screenshot
+        await new Promise(resolve => setTimeout(resolve, 100));
+
+        // Ask background to capture visible tab
+        chrome.runtime.sendMessage({ type: 'CAPTURE_VISIBLE_TAB' }, async (response) => {
+            // Restore UI immediately
+            this.restoreUIAfterCapture(uiState);
+
+            if (!response || response.error) {
+                console.error('[CONTENT] Screenshot error:', response?.error);
+                alert('Erreur lors de la capture d\'écran.');
+                return;
+            }
+
+            // Crop the screenshot
+            const dpr = window.devicePixelRatio || 1;
+            try {
+                const croppedDataUrl = await this.cropScreenshot(response.dataUrl, rect, dpr);
+
+                // Show loader
+                this.showCaptureResultLoader();
+
+                // Analyze with Claude Vision
+                await this.analyzeScreenshot(croppedDataUrl);
+            } catch (error) {
+                console.error('[CONTENT] Crop/analyze error:', error);
+                alert('Erreur lors du traitement de la capture.');
+                this.closeCaptureResultOverlay();
+            }
+        });
+    }
+
+    cropScreenshot(dataUrl, rect, dpr) {
+        return new Promise((resolve, reject) => {
+            const img = new Image();
+            img.onload = () => {
+                const canvas = document.createElement('canvas');
+                const ctx = canvas.getContext('2d');
+
+                // Scale rect by device pixel ratio
+                const sx = rect.x * dpr;
+                const sy = rect.y * dpr;
+                const sw = rect.width * dpr;
+                const sh = rect.height * dpr;
+
+                canvas.width = sw;
+                canvas.height = sh;
+                ctx.drawImage(img, sx, sy, sw, sh, 0, 0, sw, sh);
+
+                // Resize if larger than 1568px on any side (Claude limit)
+                const maxDim = 1568;
+                if (sw > maxDim || sh > maxDim) {
+                    const scale = Math.min(maxDim / sw, maxDim / sh);
+                    const newW = Math.round(sw * scale);
+                    const newH = Math.round(sh * scale);
+                    const resizedCanvas = document.createElement('canvas');
+                    resizedCanvas.width = newW;
+                    resizedCanvas.height = newH;
+                    const rctx = resizedCanvas.getContext('2d');
+                    rctx.drawImage(canvas, 0, 0, newW, newH);
+                    resolve(resizedCanvas.toDataURL('image/png'));
+                } else {
+                    resolve(canvas.toDataURL('image/png'));
+                }
+            };
+            img.onerror = reject;
+            img.src = dataUrl;
+        });
+    }
+
+    cancelCapture(overlay, uiState) {
+        const selectionRect = document.getElementById('daspalecte-selection-rect');
+        if (selectionRect) selectionRect.remove();
+        if (overlay) overlay.remove();
+        this.restoreUIAfterCapture(uiState);
+    }
+
+    restoreUIAfterCapture(uiState) {
+        if (this.toggleButton) {
+            this.toggleButton.style.removeProperty('display');
+        }
+
+        if (uiState.sidepanelVisible) {
+            const container = document.getElementById('daspalecte-sidepanel-container');
+            if (container) container.style.removeProperty('display');
+            document.documentElement.classList.add('daspalecte-page-pushed');
+        }
+    }
+
+    showCaptureResultLoader() {
+        const existing = document.getElementById('daspalecte-capture-result-overlay');
+        if (existing) existing.remove();
+
+        const overlay = document.createElement('div');
+        overlay.id = 'daspalecte-capture-result-overlay';
+        overlay.innerHTML = `
+            <div class="capture-result-content capture-loader-active">
+                <div class="loader-container">
+                    <div class="neon-spinner"></div>
+                    <p style="color: #aaa; font-family: Inter, sans-serif;">Claude analyse l'image...</p>
+                </div>
+                <button class="capture-result-close" title="Fermer">×</button>
+            </div>
+        `;
+        document.body.appendChild(overlay);
+        overlay.querySelector('.capture-result-close').onclick = () => this.closeCaptureResultOverlay();
+    }
+
+    closeCaptureResultOverlay() {
+        const overlay = document.getElementById('daspalecte-capture-result-overlay');
+        if (overlay) overlay.remove();
+    }
+
+    async analyzeScreenshot(croppedDataUrl) {
+        const CLOUD_FUNCTION_URL = 'https://daspalecte-1086562672385.europe-west1.run.app';
+
+        // Strip data URL prefix to get raw base64
+        const base64 = croppedDataUrl.split(',')[1];
+
+        try {
+            const response = await fetch(CLOUD_FUNCTION_URL, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    action: 'analyze_screenshot',
+                    image: base64,
+                    nativeLanguage: this.nativeLanguage
+                })
+            });
+
+            if (!response.ok) {
+                const errorData = await response.json();
+                console.error('[CONTENT] Erreur analyze_screenshot:', errorData);
+                throw new Error('Erreur analyse image');
+            }
+
+            const data = await response.json();
+            this.displayCaptureResult(data, croppedDataUrl);
+        } catch (error) {
+            console.error('[CONTENT] Erreur analyzeScreenshot:', error);
+            alert('Erreur lors de l\'analyse de l\'image.');
+            this.closeCaptureResultOverlay();
+        }
+    }
+
+    displayCaptureResult(data, screenshotDataUrl) {
+        const overlay = document.getElementById('daspalecte-capture-result-overlay');
+        if (!overlay) return;
+
+        const content = overlay.querySelector('.capture-result-content');
+        content.classList.remove('capture-loader-active');
+
+        const annotatedHTML = this.buildAnnotatedHTML(data);
+
+        // Build difficult words list with speaker buttons
+        let wordsHTML = '';
+        if (data.difficultWords && data.difficultWords.length > 0) {
+            wordsHTML = `
+                <div class="capture-words-section">
+                    <span class="capture-text-label">Mots difficiles</span>
+                    <div class="capture-words-list">
+                        ${data.difficultWords.map(w => `
+                            <div class="capture-word-item">
+                                <div>
+                                    <span class="capture-word-fr">${w.word}</span>
+                                    <span class="capture-speak-btn" data-word="${w.word}" title="Écouter">\u{1F50A}</span>
+                                    <span class="capture-word-tr"> — ${w.translation}</span>
+                                    ${w.definition ? `<div class="capture-word-def">${w.definition}</div>` : ''}
+                                </div>
+                            </div>
+                        `).join('')}
+                    </div>
+                </div>
+            `;
+        }
+
+        content.innerHTML = `
+            <div class="capture-result-header">
+                <h2 class="capture-result-title">Capture & Lecture</h2>
+                <div class="capture-header-actions">
+                    <div class="capture-translator-toggle">
+                        <span class="capture-toggle-label">Traducteur</span>
+                        <label class="capture-switch">
+                            <input type="checkbox" id="capture-translator-toggle-input">
+                            <span class="capture-slider"></span>
+                        </label>
+                    </div>
+                    <button class="capture-result-close" title="Fermer">×</button>
+                </div>
+            </div>
+            <div class="capture-result-body">
+                <div class="capture-result-left">
+                    <img src="${screenshotDataUrl}" alt="Capture" class="capture-screenshot-img">
+                </div>
+                <div class="capture-result-right">
+                    <span class="capture-text-label">Texte extrait</span>
+                    <div class="capture-text-container" id="capture-text-content">
+                        ${annotatedHTML}
+                    </div>
+                    ${wordsHTML}
+                </div>
+            </div>
+        `;
+
+        content.querySelector('.capture-result-close').onclick = () => this.closeCaptureResultOverlay();
+
+        // Toggle translator in overlay
+        const toggleInput = content.querySelector('#capture-translator-toggle-input');
+        const textContainer = content.querySelector('#capture-text-content');
+        let captureTranslatorEnabled = false;
+
+        toggleInput.addEventListener('change', () => {
+            captureTranslatorEnabled = toggleInput.checked;
+            textContainer.style.setProperty('cursor', captureTranslatorEnabled ? 'help' : 'default', 'important');
+        });
+
+        // Click-to-translate controlled by toggle
+        textContainer.addEventListener('click', (e) => {
+            if (!captureTranslatorEnabled) return;
+            const word = this.getWordAtPosition(e);
+            if (word) {
+                e.preventDefault();
+                e.stopPropagation();
+                this.handleWordClick(word, e);
+            }
+        }, true);
+
+        // Wire up speaker buttons
+        content.querySelectorAll('.capture-speak-btn').forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                this.speakFrench(btn.dataset.word);
+            });
+        });
+    }
+
+    buildAnnotatedHTML(data) {
+        const text = data.annotatedText || data.transcription || '';
+        // Split into paragraphs and wrap with <p> tags
+        return text.split('\n').filter(line => line.trim()).map(line =>
+            `<p style="margin: 0 0 12px 0 !important; color: #eee !important; font-family: Inter, sans-serif !important;">${line}</p>`
+        ).join('');
     }
 
     closeComprehensionTestOverlay() {

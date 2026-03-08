@@ -409,6 +409,22 @@ input:checked+.slider:before {
     box-shadow: 0 0 15px rgba(255, 0, 255, 0.4);
 }
 
+/* Capture & Lecture button */
+.capture-btn {
+    background: linear-gradient(90deg, var(--neon-magenta), #d000ff) !important;
+    color: white !important;
+    width: 100%;
+}
+
+.capture-btn:hover {
+    box-shadow: 0 0 15px rgba(255, 0, 255, 0.4);
+    filter: brightness(1.2);
+}
+
+.translator-tools {
+    margin-top: 10px;
+}
+
 .branding-footer {
     margin-top: auto;
     padding-top: 20px;
