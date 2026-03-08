@@ -81,4 +81,4 @@ Google Apps Script (scores)
 - Chrome Web Store en mode **Prive** (groupe `daspa@cnddinant.be`)
 - Eleves DASPA sur Chromebooks scolaires
 
-## Version actuelle : 1.4
+## Version actuelle : 1.5
