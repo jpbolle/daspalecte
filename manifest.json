@@ -6,6 +6,7 @@
   "permissions": [
     "storage",
     "activeTab",
+    "tabs",
     "identity"
   ],
   "host_permissions": [
@@ -37,7 +38,12 @@
   ],
   "web_accessible_resources": [
     {
-      "resources": ["sidepanel.html", "sidepanel.css", "sidepanel.js", "icon48.png"],
+      "resources": [
+        "sidepanel.html", "sidepanel.css", "sidepanel.js",
+        "pdfviewer.html", "pdfviewer.js", "pdfviewer.css",
+        "lib/pdf.min.mjs", "lib/pdf.worker.min.mjs",
+        "icon48.png"
+      ],
       "matches": ["<all_urls>"]
     }
   ],

@@ -1,6 +1,6 @@
 :root {
   --neon-cyan: #00f3ff;
-  --neon-magenta: #ff00ff;
+  --neon-magenta: #e879f9;
   --bg-dark: #0a0b1e;
   --glass-bg: rgba(255, 255, 255, 0.05);
   --glass-border: rgba(255, 255, 255, 0.1);
@@ -94,6 +94,11 @@ header {
 
 .btn-icon {
   font-size: 1.2rem;
+}
+
+.pdf-btn {
+  border-color: var(--neon-magenta);
+  box-shadow: 0 0 10px rgba(232, 121, 249, 0.2);
 }
 
 .language-section {

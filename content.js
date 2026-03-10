@@ -21,10 +21,85 @@ class DaspalecteTranslator {
         this.init();
     }
 
+    // Check if we are inside the Daspalecte PDF viewer
+    isPdfViewer() {
+        return !!document.getElementById('pdf-container');
+    }
+
+    // Detect if the current page is a PDF displayed by the native viewer
+    isPDFPage() {
+        // Never trigger on our own PDF viewer page
+        if (location.href.startsWith('chrome-extension://')) return false;
+        if (document.contentType === 'application/pdf') return true;
+        if (document.querySelector('embed[type="application/pdf"]')) return true;
+        if (location.href.toLowerCase().endsWith('.pdf')) return true;
+        return false;
+    }
+
+    // Show a floating button to open the PDF in Daspalecte's viewer
+    showPDFActivationButton() {
+        // Don't show if we're already in our viewer
+        if (location.href.includes(chrome.runtime.id)) return;
+
+        const btn = document.createElement('div');
+        btn.id = 'daspalecte-pdf-btn';
+        btn.innerHTML = `
+            <img src="${chrome.runtime.getURL('icon48.png')}" style="width:28px;height:28px;">
+            <span>Ouvrir avec Daspalecte</span>
+        `;
+        btn.style.cssText = `
+            position: fixed;
+            top: 16px;
+            right: 16px;
+            z-index: 2147483647;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 12px 20px;
+            background: rgba(10, 11, 30, 0.95);
+            border: 2px solid #00f3ff;
+            border-radius: 12px;
+            color: #00f3ff;
+            font-family: 'Inter', 'Segoe UI', sans-serif;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            backdrop-filter: blur(10px);
+            box-shadow: 0 0 20px rgba(0, 243, 255, 0.3), inset 0 0 20px rgba(0, 243, 255, 0.05);
+            transition: all 0.3s ease;
+        `;
+
+        btn.addEventListener('mouseenter', () => {
+            btn.style.boxShadow = '0 0 30px rgba(0, 243, 255, 0.5), inset 0 0 30px rgba(0, 243, 255, 0.1)';
+            btn.style.borderColor = '#4df7ff';
+        });
+        btn.addEventListener('mouseleave', () => {
+            btn.style.boxShadow = '0 0 20px rgba(0, 243, 255, 0.3), inset 0 0 20px rgba(0, 243, 255, 0.05)';
+            btn.style.borderColor = '#00f3ff';
+        });
+
+        btn.addEventListener('click', () => {
+            // Strip Adobe Acrobat or other extension URL wrappers
+            let pdfUrl = location.href;
+            const adobeMatch = pdfUrl.match(/^chrome-extension:\/\/[a-z]+\/(https?:\/\/.+)$/i);
+            if (adobeMatch) pdfUrl = adobeMatch[1];
+            const viewerUrl = chrome.runtime.getURL('pdfviewer.html') + '?url=' + encodeURIComponent(pdfUrl);
+            location.href = viewerUrl;
+        });
+
+        document.body.appendChild(btn);
+    }
+
     async init() {
+        // Detect PDF pages — show activation button instead of normal setup
+        if (this.isPDFPage()) {
+            this.showPDFActivationButton();
+            return;
+        }
+
         // NE PAS créer automatiquement l'onglet et l'iframe au chargement
         // Ils seront créés uniquement quand l'utilisateur ouvre l'extension
-        
+
         // Charger les paramètres
         await this.loadSettings();
 
@@ -35,6 +110,14 @@ class DaspalecteTranslator {
         if (this.isEnabled) {
             this.disableAllLinks();
         }
+
+        // Listen for PDF viewer ready event — re-inject magic buttons if comprehension is active
+        document.addEventListener('daspalecte-pdf-ready', () => {
+            if (this.isComprehensionEnabled) {
+                this.removeMagicButtons();
+                this.injectMagicButtons();
+            }
+        });
 
         // Synchroniser l'état entre les onglets
         chrome.storage.onChanged.addListener((changes, area) => {
@@ -499,6 +582,23 @@ class DaspalecteTranslator {
                 return;
             }
 
+            // PDF margin annotation: remove by clicking on highlighted word again
+            if (target.classList.contains('daspalecte-word') &&
+                target.dataset.annotationId) {
+                e.preventDefault();
+                e.stopPropagation();
+                const aid = target.dataset.annotationId;
+                const annot = document.querySelector(`.pdf-margin-annotation[data-word-id="${aid}"]`);
+                if (annot) annot.remove();
+                const hl = document.querySelector(`.pdf-word-highlight[data-annotation-id="${aid}"]`);
+                if (hl) hl.remove();
+                target.classList.remove('selected');
+                this.selectedWords.delete(target);
+                this.translations.delete(target);
+                delete target.dataset.annotationId;
+                return;
+            }
+
             // Obtenir le mot cliqué (les liens sont déjà désactivés)
             const word = this.getWordAtPosition(e);
             if (word) {
@@ -511,6 +611,13 @@ class DaspalecteTranslator {
 
     injectMagicButtons() {
         console.log('[CONTENT] ✨ injectMagicButtons() appelée');
+
+        // PDF viewer mode — use left-margin buttons instead of DOM reorganization
+        if (this.isPdfViewer()) {
+            this.injectPdfMagicButtons();
+            return;
+        }
+
         const paragraphs = document.querySelectorAll('p');
         console.log('[CONTENT] 📊 Paragraphes trouvés:', paragraphs.length);
 
@@ -566,6 +673,15 @@ class DaspalecteTranslator {
 
     removeMagicButtons() {
         console.log('[CONTENT] 🗑️ removeMagicButtons() appelée');
+
+        // PDF viewer mode — remove left-margin buttons
+        if (this.isPdfViewer()) {
+            document.querySelectorAll('.pdf-page-margin-left').forEach(m => m.remove());
+            document.querySelectorAll('.pdf-comprehension-card').forEach(c => c.remove());
+            console.log('[CONTENT] ✅ PDF magic buttons supprimés');
+            return;
+        }
+
         const containers = document.querySelectorAll('.daspalecte-row-container');
         console.log('[CONTENT] 📊 Containers trouvés à supprimer:', containers.length);
 
@@ -584,6 +700,160 @@ class DaspalecteTranslator {
         });
 
         console.log('[CONTENT] ✅ Boutons magiques supprimés');
+    }
+
+    // Inject magic buttons in the LEFT margin of PDF pages
+    injectPdfMagicButtons() {
+        const wrappers = document.querySelectorAll('.pdf-page-wrapper');
+        let total = 0;
+
+        wrappers.forEach(wrapper => {
+            const paragraphs = wrapper._paragraphs;
+            if (!paragraphs || paragraphs.length === 0) return;
+
+            // Create left margin container
+            let leftMargin = wrapper.querySelector('.pdf-page-margin-left');
+            if (!leftMargin) {
+                leftMargin = document.createElement('div');
+                leftMargin.className = 'pdf-page-margin-left';
+                wrapper.appendChild(leftMargin);
+            }
+
+            paragraphs.forEach((para, idx) => {
+                const btn = document.createElement('button');
+                btn.className = 'pdf-magic-btn';
+                btn.innerHTML = '✨';
+                btn.title = 'Aide à la compréhension';
+                btn.style.top = para.y + 'px';
+                btn.dataset.paraIdx = idx;
+
+                btn.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    this.handlePdfMagicClick(wrapper, para, btn, leftMargin);
+                });
+
+                leftMargin.appendChild(btn);
+                total++;
+            });
+        });
+
+        console.log('[CONTENT] ✅ PDF magic buttons injectés:', total);
+    }
+
+    // Collapse a PDF comprehension card into a bubble
+    collapsePdfComprehension(card) {
+        if (card.classList.contains('collapsed')) return;
+        card.classList.add('collapsed');
+        card._fullContent = card.innerHTML;
+        card.innerHTML = '<span class="pdf-comprehension-bubble" title="Aide à la compréhension">📖</span>';
+        card.querySelector('.pdf-comprehension-bubble').addEventListener('click', (e) => {
+            e.stopPropagation();
+            this.expandPdfComprehension(card);
+        });
+    }
+
+    // Expand a collapsed comprehension card
+    expandPdfComprehension(card) {
+        if (!card.classList.contains('collapsed')) return;
+        // Collapse all other expanded cards
+        document.querySelectorAll('.pdf-comprehension-card:not(.collapsed)').forEach(c => {
+            if (c !== card) this.collapsePdfComprehension(c);
+        });
+        card.classList.remove('collapsed');
+        card.innerHTML = card._fullContent;
+        // Re-attach buttons
+        const closeBtn = card.querySelector('.pdf-comprehension-close');
+        if (closeBtn) {
+            closeBtn.addEventListener('click', () => {
+                card.remove();
+            });
+        }
+        const minimizeBtn = card.querySelector('.pdf-comprehension-minimize');
+        if (minimizeBtn) {
+            minimizeBtn.addEventListener('click', () => {
+                this.collapsePdfComprehension(card);
+            });
+        }
+    }
+
+    // Handle magic button click on PDF — call Claude, show result in left margin
+    async handlePdfMagicClick(wrapper, para, button, leftMargin) {
+        if (button.disabled) return;
+
+        // If there's already a card for this paragraph, toggle it
+        const existingCard = leftMargin.querySelector(`.pdf-comprehension-card[data-para-y="${para.y}"]`);
+        if (existingCard) {
+            if (existingCard.classList.contains('collapsed')) {
+                this.expandPdfComprehension(existingCard);
+            } else {
+                this.collapsePdfComprehension(existingCard);
+            }
+            return;
+        }
+
+        // Collapse all other expanded comprehension cards
+        document.querySelectorAll('.pdf-comprehension-card:not(.collapsed)').forEach(c => {
+            this.collapsePdfComprehension(c);
+        });
+
+        button.disabled = true;
+        button.innerHTML = '⏳';
+
+        // Create card in left margin
+        const card = document.createElement('div');
+        card.className = 'pdf-comprehension-card';
+        card.style.top = para.y + 'px';
+        card.dataset.paraY = para.y;
+        card.innerHTML = '<div class="pdf-annotation-loading">⏳</div>';
+        leftMargin.appendChild(card);
+
+        try {
+            const result = await this.getAISummary(para.text, this.targetLang);
+
+            card.innerHTML = `
+                <div class="pdf-comprehension-header">
+                    <span>Aide à la compréhension</span>
+                    <div class="pdf-comprehension-actions">
+                        <button class="pdf-comprehension-minimize" title="Réduire">—</button>
+                        <button class="pdf-comprehension-close" title="Fermer">✕</button>
+                    </div>
+                </div>
+                <div class="pdf-comprehension-body">
+                    <div class="pdf-comprehension-section">
+                        <div class="pdf-comprehension-label">Résumé</div>
+                        <div class="pdf-comprehension-text">${result.summary || 'Non disponible'}</div>
+                    </div>
+                    <div class="pdf-comprehension-section">
+                        <div class="pdf-comprehension-label">Reformulation</div>
+                        <div class="pdf-comprehension-text">${result.reformulation || result.summary || 'Non disponible'}</div>
+                    </div>
+                </div>
+            `;
+
+            card.querySelector('.pdf-comprehension-close').addEventListener('click', () => {
+                card.remove();
+            });
+            card.querySelector('.pdf-comprehension-minimize').addEventListener('click', () => {
+                this.collapsePdfComprehension(card);
+            });
+
+            button.innerHTML = '✦';
+        } catch (error) {
+            console.error('[CONTENT] PDF comprehension error:', error);
+            card.innerHTML = `
+                <div class="pdf-comprehension-header">
+                    <span>Erreur</span>
+                    <button class="pdf-comprehension-close" title="Fermer">✕</button>
+                </div>
+                <div class="pdf-comprehension-text" style="color:#ff6b6b;">Impossible de charger l'aide</div>
+            `;
+            card.querySelector('.pdf-comprehension-close').addEventListener('click', () => {
+                card.remove();
+            });
+            button.innerHTML = '✨';
+        } finally {
+            button.disabled = false;
+        }
     }
 
     async handleMagicButtonClick(paragraph, button, summaryCol) {
@@ -1409,7 +1679,7 @@ class DaspalecteTranslator {
         const pairs = matchingData.pairs;
 
         // Distinct colors for each pair
-        const pairColors = ['#00f3ff', '#ff00ff', '#ffa500', '#32cd32', '#ff6b6b', '#9b59b6', '#f1c40f', '#1abc9c'];
+        const pairColors = ['#00f3ff', '#e879f9', '#ffa500', '#32cd32', '#ff6b6b', '#9b59b6', '#f1c40f', '#1abc9c'];
         let colorIndex = 0;
 
         // Map to track pairings: element -> partner element
@@ -2296,6 +2566,11 @@ class DaspalecteTranslator {
     }
 
     async addTranslation(wordElement, text) {
+        // PDF viewer: use margin annotations instead of inline bubbles
+        if (this.isPdfViewer()) {
+            return this.addPdfMarginAnnotation(wordElement, text);
+        }
+
         // Afficher un indicateur de chargement
         const loadingElement = document.createElement('div');
         loadingElement.className = 'daspalecte-translation daspalecte-loading';
@@ -2340,6 +2615,186 @@ class DaspalecteTranslator {
             loadingElement.textContent = '❌';
             loadingElement.className = 'daspalecte-translation daspalecte-error';
             console.error('Translation error:', error);
+        }
+    }
+
+    // Collapse a PDF annotation into a small bubble icon
+    collapsePdfAnnotation(annotation) {
+        if (annotation.classList.contains('collapsed')) return;
+        annotation.classList.add('collapsed');
+        // Store full content for later expansion
+        annotation._fullContent = annotation.innerHTML;
+        const word = annotation.querySelector('.pdf-annotation-word')?.textContent || '?';
+        annotation.innerHTML = `<span class="pdf-annotation-bubble" title="${word}">💬</span>`;
+        annotation.querySelector('.pdf-annotation-bubble').addEventListener('click', (e) => {
+            e.stopPropagation();
+            this.expandPdfAnnotation(annotation);
+        });
+        this.layoutCollapsedBubbles();
+    }
+
+    // Expand a collapsed PDF annotation back to full card
+    expandPdfAnnotation(annotation) {
+        if (!annotation.classList.contains('collapsed')) return;
+        // Collapse all other expanded annotations first
+        document.querySelectorAll('.pdf-margin-annotation:not(.collapsed)').forEach(a => {
+            if (a !== annotation) this.collapsePdfAnnotation(a);
+        });
+        annotation.classList.remove('collapsed');
+        annotation.innerHTML = annotation._fullContent;
+        // Reset horizontal offset
+        annotation.style.left = '';
+        // Re-attach event listeners
+        const closeBtn = annotation.querySelector('.pdf-annotation-close');
+        const speakBtn = annotation.querySelector('.pdf-annotation-speak');
+        const wordId = annotation.dataset.wordId;
+        if (closeBtn) {
+            closeBtn.addEventListener('click', () => {
+                const highlight = document.querySelector(`.pdf-word-highlight[data-annotation-id="${wordId}"]`);
+                if (highlight) highlight.remove();
+                annotation.remove();
+                this.layoutCollapsedBubbles();
+            });
+        }
+        if (speakBtn) {
+            speakBtn.addEventListener('click', () => {
+                this.speakFrench(speakBtn.dataset.word);
+            });
+        }
+        const minimizeBtn = annotation.querySelector('.pdf-annotation-minimize');
+        if (minimizeBtn) {
+            minimizeBtn.addEventListener('click', () => {
+                this.collapsePdfAnnotation(annotation);
+            });
+        }
+        this.layoutCollapsedBubbles();
+    }
+
+    // Arrange collapsed bubbles on the same line horizontally
+    layoutCollapsedBubbles() {
+        document.querySelectorAll('.pdf-page-margin').forEach(marginContainer => {
+            const collapsed = [...marginContainer.querySelectorAll('.pdf-margin-annotation.collapsed')];
+            if (collapsed.length === 0) return;
+
+            // Group by similar top position (within 15px = same line)
+            const lines = [];
+            collapsed.forEach(ann => {
+                const top = parseInt(ann.style.top) || 0;
+                const line = lines.find(l => Math.abs(l.top - top) < 15);
+                if (line) {
+                    line.items.push(ann);
+                } else {
+                    lines.push({ top, items: [ann] });
+                }
+            });
+
+            // For each line group, offset bubbles horizontally
+            lines.forEach(line => {
+                line.items.forEach((ann, i) => {
+                    ann.style.left = (i * 36) + 'px';
+                });
+            });
+        });
+    }
+
+    // PDF margin annotation — like Google Docs comments
+    async addPdfMarginAnnotation(wordElement, text) {
+        // Find the closest pdf-page-wrapper to position annotation relative to it
+        const pageWrapper = wordElement.closest('.pdf-page-wrapper');
+        if (!pageWrapper) return;
+
+        // Collapse all existing expanded annotations
+        document.querySelectorAll('.pdf-margin-annotation:not(.collapsed)').forEach(a => {
+            this.collapsePdfAnnotation(a);
+        });
+
+        // Ensure margin container exists for this page
+        let marginContainer = pageWrapper.querySelector('.pdf-page-margin');
+        if (!marginContainer) {
+            marginContainer = document.createElement('div');
+            marginContainer.className = 'pdf-page-margin';
+            pageWrapper.appendChild(marginContainer);
+        }
+
+        // Get word position relative to the page wrapper
+        const wrapperRect = pageWrapper.getBoundingClientRect();
+        const wordRect = wordElement.getBoundingClientRect();
+        const wordTop = wordRect.top - wrapperRect.top;
+
+        // Create highlight overlay at exact word position
+        const highlight = document.createElement('div');
+        highlight.className = 'pdf-word-highlight';
+        highlight.style.left = (wordRect.left - wrapperRect.left) + 'px';
+        highlight.style.top = (wordRect.top - wrapperRect.top) + 'px';
+        highlight.style.width = wordRect.width + 'px';
+        highlight.style.height = wordRect.height + 'px';
+        pageWrapper.appendChild(highlight);
+
+        // Create annotation card
+        const annotationId = Date.now().toString();
+        const annotation = document.createElement('div');
+        annotation.className = 'pdf-margin-annotation';
+        annotation.style.top = wordTop + 'px';
+        annotation.dataset.wordId = annotationId;
+
+        // Loading state
+        annotation.innerHTML = '<div class="pdf-annotation-loading">⏳</div>';
+        marginContainer.appendChild(annotation);
+
+        // Link for cleanup
+        wordElement.dataset.annotationId = annotationId;
+        highlight.dataset.annotationId = annotationId;
+
+        const cleanup = () => {
+            highlight.remove();
+            annotation.remove();
+            this.selectedWords.delete(wordElement);
+            this.translations.delete(wordElement);
+            delete wordElement.dataset.annotationId;
+            this.layoutCollapsedBubbles();
+        };
+
+        try {
+            const translation = await this.translateText(text);
+
+            annotation.innerHTML = `
+                <div class="pdf-annotation-header">
+                    <span class="pdf-annotation-word">${text}</span>
+                    <div class="pdf-annotation-actions">
+                        <button class="pdf-annotation-speak" data-word="${text}" title="Écouter">🔊</button>
+                        <button class="pdf-annotation-minimize" title="Réduire">—</button>
+                        <button class="pdf-annotation-close" title="Fermer">✕</button>
+                    </div>
+                </div>
+                <div class="pdf-annotation-translation">${translation}</div>
+            `;
+
+            annotation.querySelector('.pdf-annotation-close').addEventListener('click', cleanup);
+            annotation.querySelector('.pdf-annotation-minimize').addEventListener('click', () => {
+                this.collapsePdfAnnotation(annotation);
+            });
+            annotation.querySelector('.pdf-annotation-speak').addEventListener('click', () => {
+                this.speakFrench(text);
+            });
+
+            this.selectedWords.add(wordElement);
+            this.translations.set(wordElement, annotation);
+
+            this.sendMessageToSidepanel({
+                type: 'WORD_SELECTED',
+                word: text,
+                translation: translation
+            });
+
+        } catch (error) {
+            annotation.innerHTML = `
+                <div class="pdf-annotation-header">
+                    <span class="pdf-annotation-word">${text}</span>
+                    <button class="pdf-annotation-close" title="Fermer">✕</button>
+                </div>
+                <div class="pdf-annotation-translation" style="color:#ff6b6b;">Erreur</div>
+            `;
+            annotation.querySelector('.pdf-annotation-close').addEventListener('click', cleanup);
         }
     }
 

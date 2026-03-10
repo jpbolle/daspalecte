@@ -43,13 +43,25 @@ Une extension Chrome d'aide à la lecture pour les élèves **FLE** (Français L
 - Score envoye automatiquement dans une Google Sheet via Google Apps Script
 - Email de l'eleve recupere via `chrome.identity` (Chromebook)
 
+### 7. Lecture de PDF en ligne
+- Detection automatique des onglets PDF (y compris via Adobe Acrobat extension)
+- Bouton "Ouvrir avec Daspalecte" dans le popup
+- Visionneuse PDF integree avec pdf.js v4.9.155 (rendu canvas + text layer)
+- **Traduction** : annotations dans la marge droite (style Google Docs), collapsibles en bulles 💬
+- **Comprehension** : boutons magiques ✨ dans la marge gauche, reponse Claude dans un encadre cyan, collapsible en bulle 📖
+- Boutons — (reduire) et ✕ (fermer) sur chaque carte
+- Une seule carte ouverte a la fois, les autres se replient automatiquement
+- Bulles d'une meme ligne juxtaposees horizontalement
+- Zoom, navigation par page, fit-to-width, detection PDF scannes
+
 ## Architecture
 
 ```
 Extension Chrome (frontend)
-  ├── popup        → point d'entree, selection de langue
+  ├── popup        → point d'entree, selection de langue, detection PDF
   ├── sidepanel    → panneau lateral avec toggles et liste de vocabulaire
   ├── content.js   → injection dans les pages web (traduction, comprehension, exercices)
+  ├── pdfviewer    → visionneuse PDF (html/js/css) + pdf.js
   └── background   → service worker, relay de messages
 
 Cloud Function (backend)
@@ -73,12 +85,24 @@ Google Apps Script (scores)
 5. L'eleve soumet le test → `content.js` → Google Apps Script → Google Sheets (score enregistre)
 
 ## Design
-- Theme **Neon Cyberpunk** : fond sombre, cyan (#00f3ff), magenta (#ff00ff)
+- Theme **Neon Cyberpunk** : fond sombre, cyan (#00f3ff), violet clair (#e879f9)
 - Polices : Orbitron (titres), Inter (corps)
 - Effets : glow, glassmorphism, transitions fluides
 
 ## Distribution
 - Chrome Web Store en mode **Prive** (groupe `daspa@cnddinant.be`)
 - Eleves DASPA sur Chromebooks scolaires
+
+## Bug connu a investiguer
+- Depuis la persistance du sidepanel entre onglets (sync via `chrome.storage.onChanged`), Chrome bloque parfois : la sidebar tremble/bouge puis freeze complet
+- Intermittent, pas systematique
+- Piste probable : boucle infinie entre `storage.onChanged` listeners (content.js ↔ sidepanel.js) qui se renvoient des changements mutuellement (`sidepanelVisible`, `translatorEnabled`)
+- A verifier : les flags `isUpdatingToggles` et les conditions de garde dans les listeners storage
+
+## Roadmap
+1. **Test de lecture sur PDF** — a tester (devrait fonctionner via #pdf-text-content)
+2. **Exercices sur PDF** — a tester
+3. **Adaptation par niveau CECR** — A1 a C2, complexite ajustee
+4. **Suivi pedagogique** — historique, revisions espacees, stats de progression
 
 ## Version actuelle : 1.5

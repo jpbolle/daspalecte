@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Daspalecte — PDF</title>
+<link rel="stylesheet" href="pdfviewer.css">
+<link rel="stylesheet" href="content.css">
+</head>
+<body>
+
+<div id="pdf-toolbar">
+  <div id="pdf-toolbar-left">
+    <img src="icon48.png" alt="" id="pdf-logo">
+    <span id="pdf-title">Daspalecte PDF</span>
+  </div>
+  <div id="pdf-toolbar-center">
+    <button id="pdf-prev" title="Page précédente">◀</button>
+    <span id="pdf-page-info">
+      <input type="number" id="pdf-page-input" value="1" min="1"> / <span id="pdf-page-count">-</span>
+    </span>
+    <button id="pdf-next" title="Page suivante">▶</button>
+    <span id="pdf-separator">|</span>
+    <button id="pdf-zoom-out" title="Zoom -">−</button>
+    <span id="pdf-zoom-level">100%</span>
+    <button id="pdf-zoom-in" title="Zoom +">+</button>
+    <button id="pdf-zoom-fit" title="Ajuster à la largeur">↔</button>
+  </div>
+  <div id="pdf-toolbar-right">
+    <span id="pdf-scanned-warning" style="display:none;">⚠ PDF scanné — utilisez Capture OCR</span>
+  </div>
+</div>
+
+<div id="pdf-container"></div>
+
+<!-- Structured text extracted from PDF — visible for comprehension buttons and test de lecture -->
+<div id="pdf-text-content"></div>
+
+<script type="module" src="pdfviewer.js"></script>
+<script src="content.js"></script>
+
+</body>
+</html>

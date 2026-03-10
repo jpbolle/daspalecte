@@ -191,8 +191,8 @@ html.daspalecte-page-pushed {
     all: initial !important;
     display: block !important;
     background: #0a0b1e !important;
-    border: 2px solid #ff00ff !important;
-    border-left: 6px solid #ff00ff !important;
+    border: 2px solid #e879f9 !important;
+    border-left: 6px solid #e879f9 !important;
     color: #ffffff !important;
     padding: 18px !important;
     border-radius: 10px !important;
@@ -207,7 +207,7 @@ html.daspalecte-page-pushed {
     all: initial !important;
     display: flex !important;
     justify-content: space-between !important;
-    color: #ff00ff !important;
+    color: #e879f9 !important;
     font-family: Orbitron, sans-serif !important;
     font-size: 12px !important;
     text-transform: uppercase !important;
@@ -265,7 +265,7 @@ html.daspalecte-page-pushed {
 
 .summary-section .section-text {
     font-weight: 500 !important;
-    border-left-color: #ff00ff !important;
+    border-left-color: #e879f9 !important;
 }
 
 .summary-close {
@@ -280,7 +280,7 @@ html.daspalecte-page-pushed {
 }
 
 .summary-close:hover {
-    color: #ff00ff !important;
+    color: #e879f9 !important;
 }
 
 /* Forcer le style du paragraphe à l'intérieur de la colonne content */
@@ -363,7 +363,7 @@ html.daspalecte-page-pushed {
 }
 
 .overlay-close:hover {
-    color: #ff00ff !important;
+    color: #e879f9 !important;
 }
 
 .exercise-container {
@@ -380,7 +380,7 @@ html.daspalecte-page-pushed {
 }
 
 .step-counter {
-    color: #ff00ff !important;
+    color: #e879f9 !important;
     font-family: 'Orbitron', sans-serif !important;
     font-size: 11px !important;
     letter-spacing: 3px !important;
@@ -600,7 +600,7 @@ html.daspalecte-page-pushed {
 }
 
 .bullet {
-    background: #ff00ff !important;
+    background: #e879f9 !important;
     color: white !important;
     width: 28px !important;
     height: 28px !important;
@@ -733,7 +733,7 @@ html.daspalecte-page-pushed {
 .related-tag {
     background: rgba(255, 0, 255, 0.08) !important;
     border: 1px solid rgba(255, 0, 255, 0.2) !important;
-    color: #ff00ff !important;
+    color: #e879f9 !important;
     padding: 6px 15px !important;
     border-radius: 20px !important;
     font-size: 15px !important;
@@ -783,7 +783,7 @@ html.daspalecte-page-pushed {
 
 .cloze-input:focus {
     background: rgba(0, 243, 255, 0.08) !important;
-    border-bottom-color: #ff00ff !important;
+    border-bottom-color: #e879f9 !important;
     box-shadow: 0 5px 15px rgba(0, 243, 255, 0.1) !important;
 }
 
@@ -967,8 +967,8 @@ html.daspalecte-page-pushed {
 }
 
 .ct-close-btn:hover {
-    border-color: #ff00ff !important;
-    color: #ff00ff !important;
+    border-color: #e879f9 !important;
+    color: #e879f9 !important;
 }
 
 .ct-body {
@@ -985,7 +985,7 @@ html.daspalecte-page-pushed {
 }
 
 .ct-section-title {
-    color: #ff00ff !important;
+    color: #e879f9 !important;
     font-family: 'Orbitron', sans-serif !important;
     font-size: 13px !important;
     text-transform: uppercase !important;
@@ -1014,7 +1014,7 @@ html.daspalecte-page-pushed {
 }
 
 .ct-question-number {
-    background: #ff00ff !important;
+    background: #e879f9 !important;
     color: white !important;
     width: 28px !important;
     height: 28px !important;
@@ -1193,7 +1193,7 @@ html.daspalecte-page-pushed {
 
 /* Step indicator */
 .ct-step-indicator {
-    color: #ff00ff !important;
+    color: #e879f9 !important;
     font-family: 'Orbitron', sans-serif !important;
     font-size: 11px !important;
     letter-spacing: 2px !important;
@@ -1357,8 +1357,8 @@ html.daspalecte-page-pushed {
 
 .capture-cancel-btn:hover {
     background: rgba(255, 255, 255, 0.15) !important;
-    border-color: #ff00ff !important;
-    color: #ff00ff !important;
+    border-color: #e879f9 !important;
+    color: #e879f9 !important;
 }
 
 /* Result overlay — full screen */
@@ -1432,8 +1432,8 @@ html.daspalecte-page-pushed {
 }
 
 .capture-result-close:hover {
-    border-color: #ff00ff !important;
-    color: #ff00ff !important;
+    border-color: #e879f9 !important;
+    color: #e879f9 !important;
 }
 
 /* Header actions row */
@@ -1561,7 +1561,7 @@ html.daspalecte-page-pushed {
 }
 
 .capture-text-label {
-    color: #ff00ff !important;
+    color: #e879f9 !important;
     font-family: 'Orbitron', sans-serif !important;
     font-size: 12px !important;
     text-transform: uppercase !important;
@@ -1599,7 +1599,7 @@ html.daspalecte-page-pushed {
 }
 
 .capture-word-tr {
-    color: #ff00ff !important;
+    color: #e879f9 !important;
     font-style: italic !important;
 }
 

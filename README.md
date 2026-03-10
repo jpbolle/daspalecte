@@ -132,7 +132,7 @@ daspalecte/
 
 ### Design
 - **Thème** : Neon Cyberpunk
-- **Couleurs** : Cyan (#00f3ff) et Magenta (#ff00ff)
+- **Couleurs** : Cyan (#00f3ff) et Violet clair (#e879f9)
 - **Polices** : Orbitron (titres), Inter (corps)
 - **Effets** : Glow, ombres portées, transitions fluides
 
@@ -224,30 +224,14 @@ MIT License - voir le fichier LICENSE pour plus de détails
 
 ---
 
-## 🚀 Objectifs à venir
+## Objectifs à venir
 
-Les fonctionnalités suivantes sont prévues pour les prochaines versions :
-
-### Aide sonore
-- **Prononciation des mots** : Lecture audio quand on clique sur un mot traduit
-- **Lecture de phrases** : Écouter la prononciation d'une phrase ou d'un texte souligné par l'utilisateur
-- **Synthèse vocale multilingue** : Support des différentes langues maternelles
-
-### Compréhension améliorée
-- **Vérification de la compréhension** : Questions à choix multiples (QCM) après la lecture d'un paragraphe
-- **Évaluation progressive** : Suivi des progrès de l'élève
-
-### Aide lexicale visuelle
-- **OCR pour images** : Extraction et traduction du texte dans les images
-- **Outil de dessin** : Sélection de zones d'intérêt dans les images avec un cadre
-- **Analyse visuelle** : Compréhension du contexte des images pour mieux aider l'élève
+### Lecture de PDF en ligne
+- **Support des PDF** : Permettre l'utilisation de tous les outils (traducteur, compréhension, exercices, test de lecture) sur les PDF ouverts dans le navigateur
+- **Extraction de texte** : Récupérer le contenu textuel des PDF pour l'analyser
 
 ### Interface améliorée
-- **Popup de démarrage rapide** : Sélection directe de la langue maternelle au premier lancement
-- **Adaptation par niveau** : Choix du niveau CECR (A1 à C2) pour adapter la complexité
-  - Vocabulaire adapté au niveau
-  - Exercices progressifs selon le niveau
-  - Simplifications ajustées
+- **Adaptation par niveau** : Choix du niveau CECR (A1 à C2) pour adapter la complexité des exercices et simplifications
 
 ### Fonctionnalités pédagogiques
 - **Historique d'apprentissage** : Suivi des mots appris et des exercices complétés
