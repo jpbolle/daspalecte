@@ -1,13 +1,14 @@
 {
   "manifest_version": 3,
   "name": "Daspalecte",
-  "version": "1.6",
+  "version": "1.6.1",
   "description": "Aide à la lecture et compréhension pour élèves DASPA.",
   "permissions": [
     "storage",
     "activeTab",
     "tabs",
-    "identity"
+    "identity",
+    "tts"
   ],
   "host_permissions": [
     "<all_urls>"

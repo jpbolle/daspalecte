@@ -484,15 +484,13 @@ class DaspalecteTranslator {
             this.restoreComprehensionTest();
         } else if (message.type === 'START_SCREEN_CAPTURE') {
             this.startScreenCapture(message.nativeLanguage);
+        } else if (message.type === 'SPEAK_FRENCH') {
+            this.speakFrench(message.text);
         }
     }
 
     speakFrench(text) {
-        speechSynthesis.cancel();
-        const utterance = new SpeechSynthesisUtterance(text);
-        utterance.lang = 'fr-FR';
-        utterance.rate = 0.9;
-        speechSynthesis.speak(utterance);
+        chrome.runtime.sendMessage({ type: 'SPEAK_FRENCH', text });
     }
 
     async loadSettings() {

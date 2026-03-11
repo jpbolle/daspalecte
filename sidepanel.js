@@ -11,11 +11,8 @@ const captureBtn = document.getElementById('capture-btn');
 const closePanelBtn = document.getElementById('close-panel-btn');
 
 function speakFrench(text) {
-    speechSynthesis.cancel();
-    const utterance = new SpeechSynthesisUtterance(text);
-    utterance.lang = 'fr-FR';
-    utterance.rate = 0.9;
-    speechSynthesis.speak(utterance);
+    // Route through background.js using chrome.tts (more reliable than speechSynthesis)
+    sendToContentScript({ type: 'SPEAK_FRENCH', text });
 }
 
 // Flag pour éviter les cascades d'événements

@@ -62,7 +62,7 @@ Extension Chrome (frontend)
   ├── sidepanel    → panneau lateral avec toggles et liste de vocabulaire
   ├── content.js   → injection dans les pages web (traduction, comprehension, exercices)
   ├── pdfviewer    → visionneuse PDF (html/js/css) + pdf.js
-  └── background   → service worker, relay de messages
+  └── background   → service worker, relay de messages, TTS (chrome.tts)
 
 Cloud Function (backend)
   └── index.js     → recoit les requetes, appelle Claude API, renvoie JSON
@@ -77,7 +77,7 @@ Google Apps Script (scores)
 ```
 
 ## Flux de donnees
-1. L'utilisateur clique sur un mot → `content.js` envoie une requete traduction (Google Translate)
+1. L'utilisateur clique sur un mot → `content.js` envoie une requete traduction (Google Translate). Audio : content.js → background.js → `chrome.tts.speak()` (remplace `speechSynthesis` qui freeze dans Chrome)
 2. L'utilisateur capture une zone → sidepanel masque → background.js (captureVisibleTab) → crop canvas → Cloud Function (analyze_screenshot) → Claude Vision → overlay resultat
 3. L'utilisateur clique sur le bouton comprehension → `content.js` → `background.js` → Cloud Function → Claude API → reponse JSON affichee dans la page
 3. L'utilisateur genere des exercices → meme flux, avec le prompt `generate_exercises`
