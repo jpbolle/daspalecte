@@ -105,4 +105,4 @@ Google Apps Script (scores)
 3. **Adaptation par niveau CECR** — A1 a C2, complexite ajustee
 4. **Suivi pedagogique** — historique, revisions espacees, stats de progression
 
-## Version actuelle : 1.5
+## Version actuelle : 1.6
