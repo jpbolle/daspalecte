@@ -7,7 +7,7 @@ Une extension Chrome d'aide à la lecture pour les élèves **FLE** (Français L
 
 ### 1. Traducteur mot a mot
 - Clic sur un mot de n'importe quelle page web -> traduction instantanee (via Google Translate API)
-- 10 langues : arabe, anglais, dari, espagnol, pashto, polonais, roumain, russe, turc, ukrainien
+- 11 langues : arabe, anglais, dari, espagnol, kurde, pashto, polonais, roumain, russe, turc, ukrainien
 - Bulle cyan au-dessus du mot, gestion des ligatures francaises (oe, ae)
 
 ### 2. Gestion de vocabulaire
