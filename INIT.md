@@ -3,12 +3,12 @@
 ## Qu'est-ce que Daspalecte ?
 Une extension Chrome d'aide à la lecture pour les élèves **FLE** (Français Langue Etrangere), en particulier ceux du dispositif **DASPA** (Dispositif d'Accueil et de Scolarisation des eleves Primo-Arrivants) en Belgique.
 
-## Les 4 fonctionnalites principales
+## Les fonctionnalites principales
 
 ### 1. Traducteur mot a mot
 - Clic sur un mot de n'importe quelle page web -> traduction instantanee (via Google Translate API)
 - 11 langues : arabe, anglais, dari, espagnol, kurde, pashto, polonais, roumain, russe, turc, ukrainien
-- Bulle cyan au-dessus du mot, gestion des ligatures francaises (oe, ae)
+- Bulle au-dessus du mot, gestion des ligatures francaises (oe, ae)
 
 ### 2. Gestion de vocabulaire
 - Les mots traduits s'ajoutent automatiquement a une liste personnelle (Chrome Storage)
@@ -48,19 +48,35 @@ Une extension Chrome d'aide à la lecture pour les élèves **FLE** (Français L
 - Bouton "Ouvrir avec Daspalecte" dans le popup
 - Visionneuse PDF integree avec pdf.js v4.9.155 (rendu canvas + text layer)
 - **Traduction** : annotations dans la marge droite (style Google Docs), collapsibles en bulles 💬
-- **Comprehension** : boutons magiques ✨ dans la marge gauche, reponse Claude dans un encadre cyan, collapsible en bulle 📖
+- **Comprehension** : boutons magiques ✨ dans la marge gauche, reponse Claude dans un encadre, collapsible en bulle 📖
 - Boutons — (reduire) et ✕ (fermer) sur chaque carte
 - Une seule carte ouverte a la fois, les autres se replient automatiquement
 - Bulles d'une meme ligne juxtaposees horizontalement
 - Zoom, navigation par page, fit-to-width, detection PDF scannes
 
+### 8. Systeme de themes
+- **2 themes visuels** : Cyberpunk (neon, fond sombre) et Classica (tons chauds, fond creme)
+- Choix au premier lancement via un selecteur visuel (2 previews cote a cote)
+- Changement possible a tout moment via le bouton 🎨 dans la popup
+- Stocke dans `chrome.storage.local.theme`, propage en temps reel a tous les contextes
+- Fichiers cles : `themes.css` (variables CSS), `theme-manager.js` (application du theme)
+- CSS entierement refactore vers des variables `--t-*` (popup, sidepanel, content, pdfviewer)
+- Styles inline dans content.js adaptes via `getThemeColors()`
+
+### 9. Popup de l'extension
+- Boutons principaux : Gem, Outils de lecture, PDF
+- Selecteur de langue maternelle
+- 3 boutons d'action : 🎨 Theme, 🗺️ Roadmap (overlay sur la page), ℹ️ Info (lien pedagokit.be)
+
 ## Architecture
 
 ```
 Extension Chrome (frontend)
-  ├── popup        → point d'entree, selection de langue, detection PDF
+  ├── popup        → point d'entree, selection de langue, detection PDF, theme
   ├── sidepanel    → panneau lateral avec toggles et liste de vocabulaire
-  ├── content.js   → injection dans les pages web (traduction, comprehension, exercices)
+  ├── content.js   → injection dans les pages web (traduction, comprehension, exercices, roadmap)
+  ├── themes.css   → variables CSS pour les 2 themes (Cyberpunk + Classica)
+  ├── theme-manager.js → lit le theme depuis storage, applique data-theme sur :root
   ├── pdfviewer    → visionneuse PDF (html/js/css) + pdf.js
   └── background   → service worker, relay de messages, TTS (chrome.tts)
 
@@ -85,9 +101,10 @@ Google Apps Script (scores)
 5. L'eleve soumet le test → `content.js` → Google Apps Script → Google Sheets (score enregistre)
 
 ## Design
-- Theme **Neon Cyberpunk** : fond sombre, cyan (#00f3ff), violet clair (#e879f9)
-- Polices : Orbitron (titres), Inter (corps)
-- Effets : glow, glassmorphism, transitions fluides
+- **Theme Cyberpunk** : fond sombre (#0a0b1e), cyan (#00f3ff), violet (#e879f9), polices Orbitron + Inter, effets glow/glassmorphism
+- **Theme Classica** : fond creme (#faf6f0), vert (#2d6a5a), or (#d4944c), polices Playfair Display + Inter, style epure
+- Theme stocke dans `chrome.storage.local.theme` (`'cyberpunk'` ou `'classica'`)
+- Toutes les couleurs via variables CSS `--t-*` definies dans `themes.css`
 
 ## Distribution
 - Chrome Web Store en mode **Prive** (groupe `daspa@cnddinant.be`)
@@ -100,9 +117,10 @@ Google Apps Script (scores)
 - A verifier : les flags `isUpdatingToggles` et les conditions de garde dans les listeners storage
 
 ## Roadmap
-1. **Test de lecture sur PDF** — a tester (devrait fonctionner via #pdf-text-content)
-2. **Exercices sur PDF** — a tester
-3. **Adaptation par niveau CECR** — A1 a C2, complexite ajustee
-4. **Suivi pedagogique** — historique, revisions espacees, stats de progression
+1. **CSS a ameliorer** — affinage des styles, coherence entre themes
+2. **Test de lecture a ameliorer** — email automatique au prof a chaque soumission + ameliorations UX
+3. **Interface professeur** — tableau de bord pour consulter les resultats des eleves
+4. **Adaptation par niveau CECR** — A1 a C2, complexite ajustee
+5. **Suivi pedagogique** — historique, revisions espacees, stats de progression
 
-## Version actuelle : 1.6
+## Version actuelle : 1.7

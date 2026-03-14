@@ -33,6 +33,7 @@
         "content.js"
       ],
       "css": [
+        "themes.css",
         "content.css"
       ]
     }
@@ -42,6 +43,7 @@
       "resources": [
         "sidepanel.html", "sidepanel.css", "sidepanel.js",
         "pdfviewer.html", "pdfviewer.js", "pdfviewer.css",
+        "themes.css", "theme-manager.js",
         "lib/pdf.min.mjs", "lib/pdf.worker.min.mjs",
         "icon48.png"
       ],

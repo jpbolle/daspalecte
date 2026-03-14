@@ -1,0 +1,235 @@
+/* ============================================ */
+/* DASPALECTE — THEME DEFINITIONS               */
+/* ============================================ */
+
+/* ---- CYBERPUNK (default) ---- */
+:root[data-theme="cyberpunk"],
+:root:not([data-theme]) {
+  /* Core */
+  --t-primary: #00f3ff;
+  --t-accent: #e879f9;
+  --t-bg: #0a0b1e;
+  --t-bg-card: #11122d;
+  --t-bg-element: #1a1b3a;
+  --t-text: #ffffff;
+  --t-text-secondary: #e0e0e0;
+  --t-text-muted: #cccccc;
+  --t-text-dim: #999999;
+  --t-text-on-primary: #000000;
+  --t-border: rgba(255, 255, 255, 0.1);
+  --t-border-strong: rgba(255, 255, 255, 0.2);
+  --t-danger: #ff4d4d;
+  --t-success: #32cd32;
+  --t-warning: #ffa500;
+
+  /* Fonts */
+  --t-font-title: 'Orbitron', sans-serif;
+  --t-font-body: 'Inter', sans-serif;
+
+  /* Glass / transparent layers */
+  --t-glass-bg: rgba(255, 255, 255, 0.05);
+  --t-glass-bg-hover: rgba(255, 255, 255, 0.1);
+  --t-glass-bg-active: rgba(255, 255, 255, 0.15);
+
+  /* Primary alpha */
+  --t-primary-a05: rgba(0, 243, 255, 0.05);
+  --t-primary-a08: rgba(0, 243, 255, 0.08);
+  --t-primary-a10: rgba(0, 243, 255, 0.1);
+  --t-primary-a15: rgba(0, 243, 255, 0.15);
+  --t-primary-a20: rgba(0, 243, 255, 0.2);
+  --t-primary-a25: rgba(0, 243, 255, 0.25);
+  --t-primary-a30: rgba(0, 243, 255, 0.3);
+  --t-primary-a40: rgba(0, 243, 255, 0.4);
+  --t-primary-a50: rgba(0, 243, 255, 0.5);
+
+  /* Accent alpha */
+  --t-accent-a08: rgba(232, 121, 249, 0.08);
+  --t-accent-a10: rgba(232, 121, 249, 0.1);
+  --t-accent-a15: rgba(232, 121, 249, 0.15);
+  --t-accent-a20: rgba(232, 121, 249, 0.2);
+  --t-accent-a30: rgba(232, 121, 249, 0.3);
+  --t-accent-a35: rgba(232, 121, 249, 0.35);
+  --t-accent-a40: rgba(232, 121, 249, 0.4);
+  --t-accent-a50: rgba(232, 121, 249, 0.5);
+
+  /* Overlay & shadows */
+  --t-overlay-bg: rgba(10, 11, 30, 0.97);
+  --t-overlay-bg-light: rgba(10, 11, 30, 0.95);
+  --t-shadow-card: 0 4px 20px rgba(0, 0, 0, 0.5);
+  --t-shadow-popup: 0 0 50px rgba(0, 243, 255, 0.2);
+  --t-shadow-glow: 0 0 10px rgba(0, 243, 255, 0.3);
+  --t-shadow-glow-strong: 0 0 20px rgba(0, 243, 255, 0.5);
+  --t-shadow-glow-accent: 0 0 10px rgba(232, 121, 249, 0.3);
+
+  /* Gradients */
+  --t-gradient-bg: linear-gradient(135deg, rgba(0, 243, 255, 0.05), rgba(255, 0, 255, 0.05));
+  --t-gradient-panel: linear-gradient(180deg, rgba(0, 243, 255, 0.02), rgba(255, 0, 255, 0.02));
+  --t-gradient-btn: linear-gradient(90deg, #00f3ff, #00c2ff);
+  --t-gradient-btn-accent: linear-gradient(90deg, #e879f9, #d000ff);
+  --t-gradient-toggle: linear-gradient(135deg, #0a0b1e 0%, #11122d 100%);
+  --t-gradient-toggle-hover: linear-gradient(135deg, #11122d 0%, #1a1b3a 100%);
+
+  /* Specific component tokens */
+  --t-slider-bg: #333333;
+  --t-select-bg: #1a1a2e;
+  --t-input-border: rgba(0, 243, 255, 0.3);
+  --t-word-border: var(--t-accent);
+  --t-annotation-bg: rgba(232, 121, 249, 0.15);
+  --t-comprehension-bg: rgba(0, 243, 255, 0.08);
+  --t-separator: linear-gradient(90deg, transparent, rgba(0, 243, 255, 0.3), transparent);
+
+  /* Button specific */
+  --t-btn-primary-bg: var(--t-gradient-btn);
+  --t-btn-primary-text: #000000;
+  --t-btn-primary-shadow: 0 0 15px rgba(0, 243, 255, 0.4);
+  --t-btn-secondary-bg: var(--t-gradient-btn-accent);
+  --t-btn-secondary-text: #ffffff;
+
+  /* Iframe bg */
+  --t-iframe-bg: #0a0b1e;
+
+  /* Magic button */
+  --t-magic-btn-bg: #ffffff;
+  --t-magic-btn-border: #00f3ff;
+  --t-magic-btn-shadow: 0 0 15px rgba(0, 243, 255, 0.9);
+  --t-magic-btn-hover-bg: #00f3ff;
+
+  /* Translation bubble */
+  --t-translation-bg: #000000;
+  --t-translation-text: #00f3ff;
+  --t-translation-shadow: 0 2px 5px rgba(0, 0, 0, 0.5);
+
+  /* Scrollbar */
+  --t-scrollbar-track: rgba(255, 255, 255, 0.02);
+  --t-scrollbar-thumb: rgba(255, 255, 255, 0.1);
+
+  /* Letter spacing for labels (cyberpunk uses wide tracking) */
+  --t-label-spacing: 2px;
+  --t-title-spacing: 2px;
+  --t-btn-spacing: 1px;
+
+  /* Border radius */
+  --t-radius-sm: 4px;
+  --t-radius: 8px;
+  --t-radius-lg: 12px;
+  --t-radius-xl: 20px;
+
+  /* Highlight on PDF text selection */
+  --t-highlight-bg: rgba(0, 243, 255, 0.3);
+}
+
+
+/* ---- CLASSICA ---- */
+:root[data-theme="classica"] {
+  /* Core */
+  --t-primary: #2d6a5a;
+  --t-accent: #d4944c;
+  --t-bg: #faf6f0;
+  --t-bg-card: #ffffff;
+  --t-bg-element: #f0ebe3;
+  --t-text: #3d3832;
+  --t-text-secondary: #5a534b;
+  --t-text-muted: #8a7f72;
+  --t-text-dim: #a89e92;
+  --t-text-on-primary: #ffffff;
+  --t-border: #d5cec4;
+  --t-border-strong: #b5ad9f;
+  --t-danger: #b44040;
+  --t-success: #2d8a4e;
+  --t-warning: #c4862e;
+
+  /* Fonts */
+  --t-font-title: 'Playfair Display', Georgia, serif;
+  --t-font-body: 'Inter', -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
+
+  /* Glass / transparent layers */
+  --t-glass-bg: rgba(45, 106, 90, 0.04);
+  --t-glass-bg-hover: rgba(45, 106, 90, 0.08);
+  --t-glass-bg-active: rgba(45, 106, 90, 0.12);
+
+  /* Primary alpha */
+  --t-primary-a05: rgba(45, 106, 90, 0.05);
+  --t-primary-a08: rgba(45, 106, 90, 0.08);
+  --t-primary-a10: rgba(45, 106, 90, 0.10);
+  --t-primary-a15: rgba(45, 106, 90, 0.15);
+  --t-primary-a20: rgba(45, 106, 90, 0.20);
+  --t-primary-a25: rgba(45, 106, 90, 0.25);
+  --t-primary-a30: rgba(45, 106, 90, 0.30);
+  --t-primary-a40: rgba(45, 106, 90, 0.40);
+  --t-primary-a50: rgba(45, 106, 90, 0.50);
+
+  /* Accent alpha */
+  --t-accent-a08: rgba(212, 148, 76, 0.08);
+  --t-accent-a10: rgba(212, 148, 76, 0.10);
+  --t-accent-a15: rgba(212, 148, 76, 0.15);
+  --t-accent-a20: rgba(212, 148, 76, 0.20);
+  --t-accent-a30: rgba(212, 148, 76, 0.30);
+  --t-accent-a35: rgba(212, 148, 76, 0.35);
+  --t-accent-a40: rgba(212, 148, 76, 0.40);
+  --t-accent-a50: rgba(212, 148, 76, 0.50);
+
+  /* Overlay & shadows */
+  --t-overlay-bg: rgba(61, 56, 50, 0.92);
+  --t-overlay-bg-light: rgba(61, 56, 50, 0.88);
+  --t-shadow-card: 0 2px 8px rgba(0, 0, 0, 0.08);
+  --t-shadow-popup: 0 4px 16px rgba(0, 0, 0, 0.15), 0 1px 4px rgba(0, 0, 0, 0.1);
+  --t-shadow-glow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  --t-shadow-glow-strong: 0 2px 8px rgba(0, 0, 0, 0.15);
+  --t-shadow-glow-accent: 0 2px 8px rgba(212, 148, 76, 0.2);
+
+  /* Gradients */
+  --t-gradient-bg: linear-gradient(135deg, rgba(45, 106, 90, 0.03), rgba(212, 148, 76, 0.03));
+  --t-gradient-panel: linear-gradient(180deg, rgba(45, 106, 90, 0.02), rgba(212, 148, 76, 0.02));
+  --t-gradient-btn: linear-gradient(90deg, #2d6a5a, #357a68);
+  --t-gradient-btn-accent: linear-gradient(90deg, #d4944c, #c4862e);
+  --t-gradient-toggle: linear-gradient(135deg, #2d6a5a 0%, #357a68 100%);
+  --t-gradient-toggle-hover: linear-gradient(135deg, #357a68 0%, #3d8a76 100%);
+
+  /* Specific component tokens */
+  --t-slider-bg: #d5cec4;
+  --t-select-bg: #f0ebe3;
+  --t-input-border: #d5cec4;
+  --t-word-border: var(--t-accent);
+  --t-annotation-bg: rgba(212, 148, 76, 0.1);
+  --t-comprehension-bg: rgba(45, 106, 90, 0.06);
+  --t-separator: linear-gradient(90deg, transparent, #2d6a5a, transparent);
+
+  /* Button specific */
+  --t-btn-primary-bg: var(--t-gradient-btn);
+  --t-btn-primary-text: #ffffff;
+  --t-btn-primary-shadow: 0 2px 8px rgba(45, 106, 90, 0.3);
+  --t-btn-secondary-bg: var(--t-gradient-btn-accent);
+  --t-btn-secondary-text: #ffffff;
+
+  /* Iframe bg */
+  --t-iframe-bg: #faf6f0;
+
+  /* Magic button */
+  --t-magic-btn-bg: #ffffff;
+  --t-magic-btn-border: #2d6a5a;
+  --t-magic-btn-shadow: 0 2px 10px rgba(45, 106, 90, 0.4);
+  --t-magic-btn-hover-bg: #e8f0ee;
+
+  /* Translation bubble */
+  --t-translation-bg: #ffffff;
+  --t-translation-text: #2d6a5a;
+  --t-translation-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+
+  /* Scrollbar */
+  --t-scrollbar-track: rgba(0, 0, 0, 0.02);
+  --t-scrollbar-thumb: rgba(0, 0, 0, 0.12);
+
+  /* Letter spacing for labels */
+  --t-label-spacing: 2px;
+  --t-title-spacing: 1px;
+  --t-btn-spacing: 2px;
+
+  /* Border radius */
+  --t-radius-sm: 4px;
+  --t-radius: 4px;
+  --t-radius-lg: 8px;
+  --t-radius-xl: 8px;
+
+  /* Highlight on PDF text selection */
+  --t-highlight-bg: rgba(45, 106, 90, 0.25);
+}

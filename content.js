@@ -18,7 +18,55 @@ class DaspalecteTranslator {
         this.comprehensionTestAnswers = { questions: [], matching: [] };
         this.comprehensionTestPairMap = new Map();
         this.studentEmail = '';
+        this.currentTheme = 'cyberpunk';
+        this.initTheme();
         this.init();
+    }
+
+    // Apply theme to the page's <html> for CSS variables
+    initTheme() {
+        chrome.storage.local.get(['theme'], (data) => {
+            this.currentTheme = data.theme || 'cyberpunk';
+            document.documentElement.setAttribute('data-theme', this.currentTheme);
+        });
+        chrome.storage.onChanged.addListener((changes, namespace) => {
+            if (namespace === 'local' && changes.theme) {
+                this.currentTheme = changes.theme.newValue || 'cyberpunk';
+                document.documentElement.setAttribute('data-theme', this.currentTheme);
+            }
+        });
+    }
+
+    // Get theme-aware colors for inline styles
+    getThemeColors() {
+        if (this.currentTheme === 'classica') {
+            return {
+                primary: '#2d6a5a',
+                primaryHover: '#357a68',
+                accent: '#d4944c',
+                bg: '#faf6f0',
+                bgCard: '#ffffff',
+                text: '#3d3832',
+                shadow: '0 2px 8px rgba(0,0,0,0.1)',
+                shadowHover: '0 2px 12px rgba(0,0,0,0.15)',
+                primaryAlpha20: 'rgba(45, 106, 90, 0.2)',
+                primaryAlpha30: 'rgba(45, 106, 90, 0.3)',
+                primaryAlpha50: 'rgba(45, 106, 90, 0.5)',
+            };
+        }
+        return {
+            primary: '#00f3ff',
+            primaryHover: '#4df7ff',
+            accent: '#e879f9',
+            bg: '#0a0b1e',
+            bgCard: '#11122d',
+            text: '#ffffff',
+            shadow: '0 0 20px rgba(0, 243, 255, 0.3), inset 0 0 20px rgba(0, 243, 255, 0.05)',
+            shadowHover: '0 0 30px rgba(0, 243, 255, 0.5), inset 0 0 30px rgba(0, 243, 255, 0.1)',
+            primaryAlpha20: 'rgba(0, 243, 255, 0.2)',
+            primaryAlpha30: 'rgba(0, 243, 255, 0.3)',
+            primaryAlpha50: 'rgba(0, 243, 255, 0.5)',
+        };
     }
 
     // Check if we are inside the Daspalecte PDF viewer
@@ -47,6 +95,7 @@ class DaspalecteTranslator {
             <img src="${chrome.runtime.getURL('icon48.png')}" style="width:28px;height:28px;">
             <span>Ouvrir avec Daspalecte</span>
         `;
+        const tc = this.getThemeColors();
         btn.style.cssText = `
             position: fixed;
             top: 16px;
@@ -56,26 +105,26 @@ class DaspalecteTranslator {
             align-items: center;
             gap: 10px;
             padding: 12px 20px;
-            background: rgba(10, 11, 30, 0.95);
-            border: 2px solid #00f3ff;
+            background: ${this.currentTheme === 'classica' ? 'rgba(255,255,255,0.95)' : 'rgba(10, 11, 30, 0.95)'};
+            border: 2px solid ${tc.primary};
             border-radius: 12px;
-            color: #00f3ff;
+            color: ${tc.primary};
             font-family: 'Inter', 'Segoe UI', sans-serif;
             font-size: 14px;
             font-weight: 600;
             cursor: pointer;
             backdrop-filter: blur(10px);
-            box-shadow: 0 0 20px rgba(0, 243, 255, 0.3), inset 0 0 20px rgba(0, 243, 255, 0.05);
+            box-shadow: ${tc.shadow};
             transition: all 0.3s ease;
         `;
 
         btn.addEventListener('mouseenter', () => {
-            btn.style.boxShadow = '0 0 30px rgba(0, 243, 255, 0.5), inset 0 0 30px rgba(0, 243, 255, 0.1)';
-            btn.style.borderColor = '#4df7ff';
+            btn.style.boxShadow = tc.shadowHover;
+            btn.style.borderColor = tc.primaryHover;
         });
         btn.addEventListener('mouseleave', () => {
-            btn.style.boxShadow = '0 0 20px rgba(0, 243, 255, 0.3), inset 0 0 20px rgba(0, 243, 255, 0.05)';
-            btn.style.borderColor = '#00f3ff';
+            btn.style.boxShadow = tc.shadow;
+            btn.style.borderColor = tc.primary;
         });
 
         btn.addEventListener('click', () => {
@@ -164,6 +213,8 @@ class DaspalecteTranslator {
             } else if (message.type === 'SHOW_EXTENSION') {
                 this.showExtension();
                 this.showSidepanel();
+            } else if (message.type === 'SHOW_ROADMAP') {
+                this.showRoadmapOverlay();
             } else if (message.type === 'SHOW_SIDEPANEL') {
                 this.showSidepanel();
             } else if (message.type === 'HIDE_SIDEPANEL') {
@@ -1229,7 +1280,7 @@ class DaspalecteTranslator {
             // Drag & Drop events
             dropZone.addEventListener('dragover', (e) => {
                 e.preventDefault();
-                dropZone.style.background = 'rgba(0, 243, 255, 0.2)';
+                dropZone.style.background = this.getThemeColors().primaryAlpha20;
             });
 
             dropZone.addEventListener('dragleave', () => {
@@ -1677,7 +1728,10 @@ class DaspalecteTranslator {
         const pairs = matchingData.pairs;
 
         // Distinct colors for each pair
-        const pairColors = ['#00f3ff', '#e879f9', '#ffa500', '#32cd32', '#ff6b6b', '#9b59b6', '#f1c40f', '#1abc9c'];
+        const tc = this.getThemeColors();
+        const pairColors = this.currentTheme === 'classica'
+            ? ['#2d6a5a', '#d4944c', '#c4862e', '#2d8a4e', '#b44040', '#7a5fa0', '#c4a022', '#1a8a6e']
+            : ['#00f3ff', '#e879f9', '#ffa500', '#32cd32', '#ff6b6b', '#9b59b6', '#f1c40f', '#1abc9c'];
         let colorIndex = 0;
 
         // Map to track pairings: element -> partner element
@@ -1718,7 +1772,7 @@ class DaspalecteTranslator {
 
                 const frRect = frEl.getBoundingClientRect();
                 const trRect = trEl.getBoundingClientRect();
-                const color = pairColorMap.get(frEl) || '#00f3ff';
+                const color = pairColorMap.get(frEl) || tc.primary;
 
                 const x1 = frRect.right - containerRect.left;
                 const y1 = frRect.top + frRect.height / 2 - containerRect.top;
@@ -1883,11 +1937,13 @@ class DaspalecteTranslator {
             if (page1) page1.style.display = 'block';
             if (page2) page2.style.display = 'block';
 
-            // Hide step indicator and nav
+            // Hide step indicator, nav and submit button
             const stepIndicator = overlay.querySelector('#ct-step-indicator');
             if (stepIndicator) stepIndicator.textContent = 'Résultats';
             const nav = overlay.querySelector('.ct-nav');
             if (nav) nav.style.display = 'none';
+            const submitBtn = overlay.querySelector('#ct-submit-btn');
+            if (submitBtn) submitBtn.style.display = 'none';
 
             testData.questions.forEach((q, idx) => {
                 const questionDiv = overlay.querySelector(`.ct-question[data-idx="${idx}"]`);
@@ -2360,11 +2416,79 @@ class DaspalecteTranslator {
         });
     }
 
+    showRoadmapOverlay() {
+        // Remove existing if any
+        const existing = document.getElementById('daspalecte-roadmap-overlay');
+        if (existing) { existing.remove(); return; }
+
+        const overlay = document.createElement('div');
+        overlay.id = 'daspalecte-roadmap-overlay';
+        overlay.innerHTML = `
+            <div class="daspalecte-roadmap-card">
+                <div class="daspalecte-roadmap-header">
+                    <h2 class="daspalecte-roadmap-title">Daspalecte</h2>
+                    <button class="daspalecte-roadmap-close">&times;</button>
+                </div>
+                <div class="daspalecte-roadmap-section">
+                    <h3 class="daspalecte-roadmap-section-title">Nouveautes</h3>
+                    <ul class="daspalecte-roadmap-list">
+                        <li class="daspalecte-roadmap-item">
+                            <span class="daspalecte-roadmap-icon">🎨</span>
+                            <span>Choix du theme visuel (Cyberpunk / Classica)</span>
+                        </li>
+                        <li class="daspalecte-roadmap-item">
+                            <span class="daspalecte-roadmap-icon">📄</span>
+                            <span>Test de lecture sur PDF</span>
+                        </li>
+                        <li class="daspalecte-roadmap-item">
+                            <span class="daspalecte-roadmap-icon">✏️</span>
+                            <span>Exercices sur PDF</span>
+                        </li>
+                    </ul>
+                </div>
+                <div class="daspalecte-roadmap-section">
+                    <h3 class="daspalecte-roadmap-section-title">A venir</h3>
+                    <ul class="daspalecte-roadmap-list">
+                        <li class="daspalecte-roadmap-item">
+                            <span class="daspalecte-roadmap-icon">🎨</span>
+                            <span>CSS a ameliorer</span>
+                        </li>
+                        <li class="daspalecte-roadmap-item">
+                            <span class="daspalecte-roadmap-icon">📝</span>
+                            <span>Test de lecture : email au prof + ameliorations</span>
+                        </li>
+                        <li class="daspalecte-roadmap-item">
+                            <span class="daspalecte-roadmap-icon">👩‍🏫</span>
+                            <span>Interface professeur</span>
+                        </li>
+                        <li class="daspalecte-roadmap-item">
+                            <span class="daspalecte-roadmap-icon">📊</span>
+                            <span>Adaptation par niveau CECR (A1 → C2)</span>
+                        </li>
+                        <li class="daspalecte-roadmap-item">
+                            <span class="daspalecte-roadmap-icon">📈</span>
+                            <span>Suivi pedagogique & revisions espacees</span>
+                        </li>
+                    </ul>
+                </div>
+            </div>
+        `;
+
+        document.body.appendChild(overlay);
+
+        // Close on X button
+        overlay.querySelector('.daspalecte-roadmap-close').addEventListener('click', () => overlay.remove());
+        // Close on click outside card
+        overlay.addEventListener('click', (e) => {
+            if (e.target === overlay) overlay.remove();
+        });
+    }
+
     buildAnnotatedHTML(data) {
         const text = data.annotatedText || data.transcription || '';
         // Split into paragraphs and wrap with <p> tags
         return text.split('\n').filter(line => line.trim()).map(line =>
-            `<p style="margin: 0 0 12px 0 !important; color: #eee !important; font-family: Inter, sans-serif !important;">${line}</p>`
+            `<p style="margin: 0 0 12px 0 !important; color: var(--t-text) !important; font-family: Inter, sans-serif !important;">${line}</p>`
         ).join('');
     }
 

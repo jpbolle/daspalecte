@@ -1,43 +1,36 @@
-:root {
-    --neon-cyan: #00f3ff;
-    --neon-magenta: #e879f9;
-    --bg-dark: #0a0b1e;
-    --glass-bg: rgba(255, 255, 255, 0.05);
-    --glass-border: rgba(255, 255, 255, 0.1);
-    --panel-width: 100%;
-}
+/* sidepanel.css — uses theme variables from themes.css */
 
 body {
     margin: 0;
     padding: 0;
-    background-color: var(--bg-dark);
-    color: #e0e0e0;
-    font-family: 'Inter', sans-serif;
+    background-color: var(--t-bg);
+    color: var(--t-text-secondary);
+    font-family: var(--t-font-body);
     height: 100vh;
     overflow-x: hidden;
 }
 
 .panel-container {
     padding: 20px;
-    background: linear-gradient(180deg, rgba(0, 243, 255, 0.02), rgba(255, 0, 255, 0.02));
+    background: var(--t-gradient-panel);
     min-height: 100vh;
     box-sizing: border-box;
     display: flex;
     flex-direction: column;
-    position: relative; /* Pour positionner le bouton X */
+    position: relative;
 }
 
-/* Bouton X de fermeture */
+/* Close button */
 .close-panel-btn {
     position: absolute;
     top: 15px;
     right: 15px;
     width: 40px;
     height: 40px;
-    border: 2px solid var(--neon-cyan);
+    border: 2px solid var(--t-primary);
     border-radius: 50%;
     background: rgba(0, 0, 0, 0.3);
-    color: var(--neon-cyan);
+    color: var(--t-primary);
     font-size: 28px;
     font-weight: bold;
     line-height: 1;
@@ -47,12 +40,12 @@ body {
     justify-content: center;
     transition: all 0.3s ease;
     z-index: 10;
-    box-shadow: 0 0 10px rgba(0, 243, 255, 0.3);
+    box-shadow: var(--t-shadow-glow);
 }
 
 .close-panel-btn:hover {
-    background: rgba(0, 243, 255, 0.1);
-    box-shadow: 0 0 20px rgba(0, 243, 255, 0.6);
+    background: var(--t-primary-a10);
+    box-shadow: var(--t-shadow-glow-strong);
     transform: rotate(90deg);
 }
 
@@ -62,31 +55,31 @@ body {
 
 header {
     margin-bottom: 30px;
-    border-bottom: 1px solid var(--glass-border);
+    border-bottom: 1px solid var(--t-border);
     padding-bottom: 10px;
 }
 
 .neon-text {
-    font-family: 'Orbitron', sans-serif;
+    font-family: var(--t-font-title);
     font-size: 1.5rem;
     margin: 0;
-    color: var(--neon-cyan);
-    text-shadow: 0 0 10px rgba(0, 243, 255, 0.3);
-    letter-spacing: 2px;
+    color: var(--t-primary);
+    text-shadow: var(--t-shadow-glow);
+    letter-spacing: var(--t-title-spacing);
     text-transform: uppercase;
 }
 
 .tool-section {
-    background: var(--glass-bg);
-    border: 1px solid var(--glass-border);
-    border-radius: 12px;
+    background: var(--t-glass-bg);
+    border: 1px solid var(--t-border);
+    border-radius: var(--t-radius-lg);
     margin-bottom: 20px;
     padding: 16px;
     transition: transform 0.2s ease;
 }
 
 .tool-section:hover {
-    border-color: rgba(255, 255, 255, 0.2);
+    border-color: var(--t-border-strong);
 }
 
 .section-header {
@@ -97,10 +90,10 @@ header {
 }
 
 h2 {
-    font-family: 'Orbitron', sans-serif;
+    font-family: var(--t-font-title);
     font-size: 0.9rem;
     margin: 0;
-    color: var(--neon-cyan);
+    color: var(--t-primary);
     opacity: 0.9;
 }
 
@@ -116,12 +109,12 @@ h2 {
     cursor: pointer;
     font-size: 1rem;
     padding: 2px 4px;
-    border-radius: 4px;
+    border-radius: var(--t-radius-sm);
     transition: all 0.2s ease;
     opacity: 0.8;
 }
 .header-icon-btn:hover {
-    background: rgba(255, 0, 255, 0.15);
+    background: var(--t-accent-a15);
     opacity: 1;
 }
 .header-icon-btn.hidden {
@@ -155,7 +148,7 @@ h2 {
     left: 0;
     right: 0;
     bottom: 0;
-    background-color: #333;
+    background-color: var(--t-slider-bg);
     transition: .4s;
 }
 
@@ -171,8 +164,8 @@ h2 {
 }
 
 input:checked+.slider {
-    background-color: var(--neon-cyan);
-    box-shadow: 0 0 10px var(--neon-cyan);
+    background-color: var(--t-primary);
+    box-shadow: var(--t-shadow-glow);
 }
 
 input:checked+.slider:before {
@@ -188,11 +181,11 @@ input:checked+.slider:before {
 }
 
 .futuristic-select {
-    background: #1a1a2e;
-    border: 1px solid var(--glass-border);
-    color: white;
+    background: var(--t-select-bg);
+    border: 1px solid var(--t-border);
+    color: var(--t-text);
     padding: 8px;
-    border-radius: 6px;
+    border-radius: var(--t-radius-sm);
     font-size: 0.85rem;
     outline: none;
 }
@@ -201,9 +194,9 @@ input:checked+.slider:before {
     min-height: 100px;
     max-height: 400px;
     overflow-y: auto;
-    border: 1px solid rgba(255, 255, 255, 0.05);
-    background: rgba(0, 0, 0, 0.2);
-    border-radius: 6px;
+    border: 1px solid var(--t-glass-bg);
+    background: var(--t-scrollbar-track);
+    border-radius: var(--t-radius-sm);
     padding: 8px;
 }
 
@@ -218,17 +211,17 @@ input:checked+.slider:before {
     display: flex;
     align-items: center;
     gap: 10px;
-    background: rgba(255, 255, 255, 0.03);
+    background: var(--t-glass-bg);
     padding: 8px 10px;
-    border-radius: 4px;
+    border-radius: var(--t-radius-sm);
     margin-bottom: 6px;
     font-size: 0.85rem;
-    border-left: 2px solid var(--neon-magenta);
+    border-left: 2px solid var(--t-accent);
     transition: background 0.2s ease;
 }
 
 .word-item:hover {
-    background: rgba(255, 255, 255, 0.06);
+    background: var(--t-glass-bg-hover);
 }
 
 .word-checkbox {
@@ -236,30 +229,30 @@ input:checked+.slider:before {
     -webkit-appearance: none;
     width: 18px;
     height: 18px;
-    border: 2px solid rgba(255, 255, 255, 0.4);
-    border-radius: 4px;
+    border: 2px solid var(--t-text-dim);
+    border-radius: var(--t-radius-sm);
     cursor: pointer;
     position: relative;
-    background: rgba(0, 0, 0, 0.4);
+    background: var(--t-scrollbar-track);
     flex-shrink: 0;
     transition: all 0.2s ease;
 }
 
 .word-checkbox:hover {
-    border-color: var(--neon-cyan);
-    box-shadow: 0 0 5px rgba(0, 243, 255, 0.3);
+    border-color: var(--t-primary);
+    box-shadow: var(--t-shadow-glow);
 }
 
 .word-checkbox:checked {
-    border-color: var(--neon-cyan);
-    background: rgba(0, 243, 255, 0.15);
-    box-shadow: 0 0 8px rgba(0, 243, 255, 0.2);
+    border-color: var(--t-primary);
+    background: var(--t-primary-a15);
+    box-shadow: var(--t-shadow-glow);
 }
 
 .word-checkbox:checked::after {
-    content: "✓";
+    content: "\2713";
     position: absolute;
-    color: var(--neon-cyan);
+    color: var(--t-primary);
     font-size: 12px;
     top: 50%;
     left: 50%;
@@ -276,8 +269,14 @@ input:checked+.slider:before {
     background: none;
     border: none;
     padding: 0 2px;
+    margin-left: 6px;
     margin-right: auto;
     filter: grayscale(1) brightness(10);
+}
+:root[data-theme="classica"] .word-speak-btn {
+    filter: none;
+    color: var(--t-primary);
+    opacity: 0.7;
 }
 .word-speak-btn:hover {
     opacity: 1;
@@ -316,12 +315,12 @@ input:checked+.slider:before {
 }
 
 .icon-btn {
-    background: rgba(255, 255, 255, 0.05);
-    border: 1px solid var(--glass-border);
-    color: white;
+    background: var(--t-glass-bg);
+    border: 1px solid var(--t-border);
+    color: var(--t-text);
     width: 38px;
     height: 38px;
-    border-radius: 6px;
+    border-radius: var(--t-radius-sm);
     display: flex;
     align-items: center;
     justify-content: center;
@@ -330,9 +329,9 @@ input:checked+.slider:before {
 }
 
 .icon-btn:hover {
-    background: rgba(255, 0, 255, 0.1);
-    border-color: var(--neon-magenta);
-    box-shadow: 0 0 10px rgba(255, 0, 255, 0.2);
+    background: var(--t-accent-a10);
+    border-color: var(--t-accent);
+    box-shadow: var(--t-shadow-glow-accent);
 }
 
 .icon-btn.delete .icon {
@@ -343,7 +342,7 @@ input:checked+.slider:before {
     display: none;
 }
 
-/* Styles pour la nouvelle section compréhension */
+/* Comprehension section styles */
 .tool-desc {
     font-size: 0.75rem;
     opacity: 0.6;
@@ -360,16 +359,16 @@ input:checked+.slider:before {
 
 .field-group label {
     font-size: 0.8rem;
-    color: var(--neon-magenta);
+    color: var(--t-accent);
     opacity: 0.9;
 }
 
 .text-link {
     background: none;
     border: none;
-    color: var(--neon-cyan);
+    color: var(--t-primary);
     font-size: 0.75rem;
-    font-family: 'Inter', sans-serif;
+    font-family: var(--t-font-body);
     cursor: pointer;
     opacity: 0.6;
     transition: opacity 0.2s;
@@ -383,12 +382,12 @@ input:checked+.slider:before {
 
 .action-btn {
     flex: 1;
-    background: linear-gradient(90deg, var(--neon-cyan), #00c2ff);
+    background: var(--t-btn-primary-bg);
     border: none;
-    color: #000;
+    color: var(--t-btn-primary-text);
     padding: 10px;
-    border-radius: 6px;
-    font-family: 'Orbitron', sans-serif;
+    border-radius: var(--t-radius-sm);
+    font-family: var(--t-font-title);
     font-weight: bold;
     font-size: 0.75rem;
     cursor: pointer;
@@ -397,27 +396,27 @@ input:checked+.slider:before {
 
 .action-btn:hover {
     filter: brightness(1.2);
-    box-shadow: 0 0 15px rgba(0, 243, 255, 0.4);
+    box-shadow: var(--t-btn-primary-shadow);
 }
 
 .action-btn.secondary {
-    background: linear-gradient(90deg, var(--neon-magenta), #d000ff);
-    color: white;
+    background: var(--t-btn-secondary-bg);
+    color: var(--t-btn-secondary-text);
 }
 
 .action-btn.secondary:hover {
-    box-shadow: 0 0 15px rgba(255, 0, 255, 0.4);
+    box-shadow: var(--t-shadow-glow-accent);
 }
 
 /* Capture & Lecture button */
 .capture-btn {
-    background: linear-gradient(90deg, var(--neon-magenta), #d000ff) !important;
-    color: white !important;
+    background: var(--t-btn-secondary-bg) !important;
+    color: var(--t-btn-secondary-text) !important;
     width: 100%;
 }
 
 .capture-btn:hover {
-    box-shadow: 0 0 15px rgba(255, 0, 255, 0.4);
+    box-shadow: var(--t-shadow-glow-accent);
     filter: brightness(1.2);
 }
 
@@ -428,7 +427,7 @@ input:checked+.slider:before {
 .branding-footer {
     margin-top: auto;
     padding-top: 20px;
-    border-top: 1px solid var(--glass-border);
+    border-top: 1px solid var(--t-border);
     display: flex;
     flex-direction: row;
     justify-content: center;
@@ -440,9 +439,9 @@ input:checked+.slider:before {
 .branding-footer p {
     margin: 0;
     font-size: 0.8rem;
-    color: var(--neon-cyan);
+    color: var(--t-primary);
     opacity: 0.8;
-    font-family: 'Orbitron', sans-serif;
+    font-family: var(--t-font-title);
     letter-spacing: 1px;
     white-space: nowrap;
 }

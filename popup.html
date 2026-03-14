@@ -5,13 +5,64 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Daspalecte</title>
+  <link rel="stylesheet" href="themes.css">
   <link rel="stylesheet" href="popup.css">
-  <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700&family=Inter:wght@300;400;600&display=swap"
+  <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700&family=Playfair+Display:wght@400;700;900&family=Inter:wght@300;400;500;600;700&display=swap"
     rel="stylesheet">
 </head>
 
 <body>
-  <div class="glass-container">
+  <!-- Theme chooser overlay (shown on first launch or via toggle) -->
+  <div id="theme-chooser" class="theme-chooser-overlay">
+    <p class="theme-chooser-title">Choisis ton style !</p>
+    <p class="theme-chooser-subtitle">Tu pourras changer plus tard</p>
+    <div class="theme-chooser-cards">
+      <!-- Cyberpunk preview -->
+      <div class="theme-card" data-theme-choice="cyberpunk">
+        <div class="theme-preview-cyberpunk">
+          <div class="preview-title">Daspalecte</div>
+          <div class="preview-btn">🛠️ Outils de lecture</div>
+          <div class="preview-toggle">
+            <div class="preview-toggle-track"></div>
+            <span class="preview-toggle-label">Traducteur</span>
+          </div>
+          <div class="preview-word">
+            <span class="preview-word-fr">bonjour</span>
+            <span class="preview-word-tr">hello</span>
+          </div>
+          <div class="preview-word">
+            <span class="preview-word-fr">merci</span>
+            <span class="preview-word-tr">thanks</span>
+          </div>
+          <div class="preview-name">Cyberpunk</div>
+        </div>
+      </div>
+      <!-- Classica preview -->
+      <div class="theme-card" data-theme-choice="classica">
+        <div class="theme-preview-classica">
+          <div class="preview-title">Daspalecte</div>
+          <div class="preview-btn">🛠️ Outils de lecture</div>
+          <div class="preview-toggle">
+            <div class="preview-toggle-track"></div>
+            <span class="preview-toggle-label">Traducteur</span>
+          </div>
+          <div class="preview-word">
+            <span class="preview-word-fr">bonjour</span>
+            <span class="preview-word-tr">hello</span>
+          </div>
+          <div class="preview-word">
+            <span class="preview-word-fr">merci</span>
+            <span class="preview-word-tr">thanks</span>
+          </div>
+          <div class="preview-name">Classica</div>
+        </div>
+      </div>
+    </div>
+    <button id="theme-confirm" class="theme-chooser-confirm" disabled>Confirmer</button>
+  </div>
+
+  <!-- Main popup content -->
+  <div id="main-popup" class="glass-container" style="display:none;">
     <header>
       <h1 class="neon-text">Daspalecte</h1>
       <p class="subtitle">Assistant de lecture DASPA</p>
@@ -49,12 +100,20 @@
       </select>
     </div>
 
+    <div class="popup-actions">
+      <button id="theme-toggle-btn" class="popup-action-btn" title="Changer de thème">🎨</button>
+      <button id="btn-roadmap" class="popup-action-btn" title="Roadmap">🗺️</button>
+      <button id="btn-info" class="popup-action-btn" title="En savoir plus">ℹ️</button>
+    </div>
+
     <footer class="branding-footer">
       <p>2026 - version 1.6</p>
       <img src="https://drive.google.com/thumbnail?id=17m5J5zlV1SrLhJeX8JBzK2QZMWwFgXgf&sz=w500" alt="Logo PedagokIT"
         class="branding-logo">
     </footer>
   </div>
+
+  <script src="theme-manager.js"></script>
   <script src="popup.js"></script>
 </body>
 
