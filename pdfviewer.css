@@ -543,3 +543,28 @@ body {
 @keyframes spin {
     to { transform: rotate(360deg); }
 }
+
+/* ---- CLASSICA overrides for PDF toolbar ---- */
+:root[data-daspalecte-theme="classica"] #pdf-toolbar {
+    background: var(--t-bg-card);
+    border-bottom: 1px solid var(--t-border-strong);
+    box-shadow: 0 1px 4px rgba(0, 0, 0, 0.08);
+    backdrop-filter: none;
+}
+
+:root[data-daspalecte-theme="classica"] #pdf-toolbar button {
+    background: var(--t-primary-a08);
+    border-color: var(--t-primary-a25);
+    color: var(--t-primary);
+}
+
+:root[data-daspalecte-theme="classica"] #pdf-toolbar button:hover {
+    background: var(--t-primary-a15);
+    border-color: var(--t-primary);
+}
+
+:root[data-daspalecte-theme="classica"] #pdf-page-input {
+    background: var(--t-bg-element);
+    border-color: var(--t-border-strong);
+    color: var(--t-text);
+}

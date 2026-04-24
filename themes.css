@@ -3,8 +3,8 @@
 /* ============================================ */
 
 /* ---- CYBERPUNK (default) ---- */
-:root[data-theme="cyberpunk"],
-:root:not([data-theme]) {
+:root[data-daspalecte-theme="cyberpunk"],
+:root:not([data-daspalecte-theme]) {
   /* Core */
   --t-primary: #00f3ff;
   --t-accent: #e879f9;
@@ -120,7 +120,7 @@
 
 
 /* ---- CLASSICA ---- */
-:root[data-theme="classica"] {
+:root[data-daspalecte-theme="classica"] {
   /* Core */
   --t-primary: #2d6a5a;
   --t-accent: #d4944c;
@@ -211,9 +211,9 @@
   --t-magic-btn-hover-bg: #e8f0ee;
 
   /* Translation bubble */
-  --t-translation-bg: #ffffff;
-  --t-translation-text: #2d6a5a;
-  --t-translation-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+  --t-translation-bg: #2d6a5a;
+  --t-translation-text: #ffffff;
+  --t-translation-shadow: 0 2px 8px rgba(45, 106, 90, 0.4);
 
   /* Scrollbar */
   --t-scrollbar-track: rgba(0, 0, 0, 0.02);

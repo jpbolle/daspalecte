@@ -110,6 +110,23 @@ Google Apps Script (scores)
 - Chrome Web Store en mode **Prive** (groupe `daspa@cnddinant.be`)
 - Eleves DASPA sur Chromebooks scolaires
 
+## Changements v1.7 → en cours
+
+### Bouton PDF flottant (Google Drive / Chromebook)
+- Ajout d'un bouton **✕** pour masquer le bouton sans ouvrir le PDF
+- Glisser-deposer : l'utilisateur peut repositionner le bouton pour ne pas masquer d'autres elements de la page
+- Fichier : `content.js` → methode `showPDFActivationButton()`
+
+### Isolation du theme (attribut data-daspalecte-theme)
+- Renommage `data-theme` → `data-daspalecte-theme` dans tous les fichiers CSS et JS
+- Evite toute collision avec des apps tierces (localhost ou autres) qui utilisent aussi `data-theme`
+- Fichiers touches : `themes.css`, `content.css`, `sidepanel.css`, `content.js`, `theme-manager.js`, `popup.js`
+
+### Corrections visuelles theme Classica
+- Bulle de traduction : fond vert (`#2d6a5a`) + texte blanc — etait fond blanc illisible
+- En-tete PDF viewer : fond blanc carte + ombre legere — etait fond noir avec texte vert illisible
+- Fichiers touches : `themes.css`, `pdfviewer.css`
+
 ## Bug connu a investiguer
 - Depuis la persistance du sidepanel entre onglets (sync via `chrome.storage.onChanged`), Chrome bloque parfois : la sidebar tremble/bouge puis freeze complet
 - Intermittent, pas systematique

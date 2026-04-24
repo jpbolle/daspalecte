@@ -87,7 +87,7 @@ html.daspalecte-page-pushed {
     transition: opacity 0.2s ease;
     filter: grayscale(1) brightness(10);
 }
-:root[data-theme="classica"] .daspalecte-speak-btn {
+:root[data-daspalecte-theme="classica"] .daspalecte-speak-btn {
     filter: none;
     color: #2d6a5a;
 }
@@ -190,14 +190,14 @@ html.daspalecte-page-pushed {
     background: var(--t-magic-btn-hover-bg) !important;
 }
 
-:root[data-theme="classica"] .daspalecte-magic-btn {
+:root[data-daspalecte-theme="classica"] .daspalecte-magic-btn {
     background: #e8f0ee !important;
     border-color: #2d6a5a !important;
     color: #2d6a5a !important;
     box-shadow: 0 2px 10px rgba(45, 106, 90, 0.3) !important;
 }
 
-:root[data-theme="classica"] .daspalecte-magic-btn:hover {
+:root[data-daspalecte-theme="classica"] .daspalecte-magic-btn:hover {
     background: #2d6a5a !important;
     color: #ffffff !important;
 }
@@ -1533,7 +1533,7 @@ html.daspalecte-page-pushed {
     filter: grayscale(1) brightness(10) !important;
 }
 
-:root[data-theme="classica"] .capture-speak-btn {
+:root[data-daspalecte-theme="classica"] .capture-speak-btn {
     filter: none !important;
     color: #2d6a5a !important;
     opacity: 0.7 !important;
@@ -1583,7 +1583,7 @@ html.daspalecte-page-pushed {
     cursor: default !important;
 }
 
-:root[data-theme="classica"] .capture-text-container {
+:root[data-daspalecte-theme="classica"] .capture-text-container {
     background: #ffffff !important;
     border: 1.5px solid #d5cec4 !important;
     color: #3d3832 !important;

@@ -27,12 +27,12 @@ class DaspalecteTranslator {
     initTheme() {
         chrome.storage.local.get(['theme'], (data) => {
             this.currentTheme = data.theme || 'cyberpunk';
-            document.documentElement.setAttribute('data-theme', this.currentTheme);
+            document.documentElement.setAttribute('data-daspalecte-theme', this.currentTheme);
         });
         chrome.storage.onChanged.addListener((changes, namespace) => {
             if (namespace === 'local' && changes.theme) {
                 this.currentTheme = changes.theme.newValue || 'cyberpunk';
-                document.documentElement.setAttribute('data-theme', this.currentTheme);
+                document.documentElement.setAttribute('data-daspalecte-theme', this.currentTheme);
             }
         });
     }
@@ -91,10 +91,6 @@ class DaspalecteTranslator {
 
         const btn = document.createElement('div');
         btn.id = 'daspalecte-pdf-btn';
-        btn.innerHTML = `
-            <img src="${chrome.runtime.getURL('icon48.png')}" style="width:28px;height:28px;">
-            <span>Ouvrir avec Daspalecte</span>
-        `;
         const tc = this.getThemeColors();
         btn.style.cssText = `
             position: fixed;
@@ -104,7 +100,7 @@ class DaspalecteTranslator {
             display: flex;
             align-items: center;
             gap: 10px;
-            padding: 12px 20px;
+            padding: 10px 16px;
             background: ${this.currentTheme === 'classica' ? 'rgba(255,255,255,0.95)' : 'rgba(10, 11, 30, 0.95)'};
             border: 2px solid ${tc.primary};
             border-radius: 12px;
@@ -112,28 +108,74 @@ class DaspalecteTranslator {
             font-family: 'Inter', 'Segoe UI', sans-serif;
             font-size: 14px;
             font-weight: 600;
-            cursor: pointer;
+            cursor: grab;
             backdrop-filter: blur(10px);
             box-shadow: ${tc.shadow};
-            transition: all 0.3s ease;
+            transition: box-shadow 0.3s ease, border-color 0.3s ease;
+            user-select: none;
+        `;
+        btn.innerHTML = `
+            <img src="${chrome.runtime.getURL('icon48.png')}" style="width:28px;height:28px;pointer-events:none;">
+            <span style="pointer-events:none;">Ouvrir avec Daspalecte</span>
+            <span id="daspalecte-pdf-close" style="
+                margin-left:6px; font-size:15px; line-height:1; opacity:0.5;
+                cursor:pointer; padding:2px 5px; border-radius:4px;
+                transition: opacity 0.2s, background 0.2s;
+            ">✕</span>
         `;
 
-        btn.addEventListener('mouseenter', () => {
-            btn.style.boxShadow = tc.shadowHover;
-            btn.style.borderColor = tc.primaryHover;
-        });
-        btn.addEventListener('mouseleave', () => {
-            btn.style.boxShadow = tc.shadow;
-            btn.style.borderColor = tc.primary;
+        // Close button
+        const closeBtn = btn.querySelector('#daspalecte-pdf-close');
+        closeBtn.addEventListener('mouseenter', () => { closeBtn.style.opacity = '1'; closeBtn.style.background = 'rgba(255,60,60,0.25)'; });
+        closeBtn.addEventListener('mouseleave', () => { closeBtn.style.opacity = '0.5'; closeBtn.style.background = 'transparent'; });
+        closeBtn.addEventListener('click', (e) => { e.stopPropagation(); btn.remove(); });
+
+        // Drag logic
+        let isDragging = false, dragMoved = false, dragOffsetX = 0, dragOffsetY = 0;
+
+        btn.addEventListener('mousedown', (e) => {
+            if (e.target.id === 'daspalecte-pdf-close') return;
+            isDragging = true;
+            dragMoved = false;
+            const rect = btn.getBoundingClientRect();
+            dragOffsetX = e.clientX - rect.left;
+            dragOffsetY = e.clientY - rect.top;
+            btn.style.cursor = 'grabbing';
+            btn.style.transition = 'none';
+            e.preventDefault();
         });
 
-        btn.addEventListener('click', () => {
-            // Strip Adobe Acrobat or other extension URL wrappers
+        document.addEventListener('mousemove', (e) => {
+            if (!isDragging) return;
+            dragMoved = true;
+            btn.style.left = (e.clientX - dragOffsetX) + 'px';
+            btn.style.top  = (e.clientY - dragOffsetY) + 'px';
+            btn.style.right = 'auto';
+        });
+
+        document.addEventListener('mouseup', () => {
+            if (!isDragging) return;
+            isDragging = false;
+            btn.style.cursor = 'grab';
+            btn.style.transition = 'box-shadow 0.3s ease, border-color 0.3s ease';
+        });
+
+        // Open PDF viewer on click (not after a drag)
+        btn.addEventListener('click', (e) => {
+            if (e.target.id === 'daspalecte-pdf-close') return;
+            if (dragMoved) { dragMoved = false; return; }
             let pdfUrl = location.href;
             const adobeMatch = pdfUrl.match(/^chrome-extension:\/\/[a-z]+\/(https?:\/\/.+)$/i);
             if (adobeMatch) pdfUrl = adobeMatch[1];
             const viewerUrl = chrome.runtime.getURL('pdfviewer.html') + '?url=' + encodeURIComponent(pdfUrl);
             location.href = viewerUrl;
+        });
+
+        btn.addEventListener('mouseenter', () => {
+            if (!isDragging) { btn.style.boxShadow = tc.shadowHover; btn.style.borderColor = tc.primaryHover; }
+        });
+        btn.addEventListener('mouseleave', () => {
+            btn.style.boxShadow = tc.shadow; btn.style.borderColor = tc.primary;
         });
 
         document.body.appendChild(btn);

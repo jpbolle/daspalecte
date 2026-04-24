@@ -11,7 +11,7 @@
 ## Conventions de code
 - Pas de frameworks JS (pas de React, Vue, etc.) — JavaScript vanilla uniquement
 - Respecter le theme visuel Neon Cyberpunk (voir `INIT.md` pour les couleurs/polices)
-- Le content script (`content.js`) est le fichier le plus volumineux (~1200 lignes) — toute modification doit etre prudente
+- Le content script (`content.js`) est le fichier le plus volumineux (~3000 lignes) — toute modification doit etre prudente
 
 ## Securite
 - Ne jamais exposer l'URL de l'endpoint Cloud Function dans le code public ou le README

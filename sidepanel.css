@@ -273,7 +273,7 @@ input:checked+.slider:before {
     margin-right: auto;
     filter: grayscale(1) brightness(10);
 }
-:root[data-theme="classica"] .word-speak-btn {
+:root[data-daspalecte-theme="classica"] .word-speak-btn {
     filter: none;
     color: var(--t-primary);
     opacity: 0.7;

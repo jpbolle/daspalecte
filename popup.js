@@ -35,7 +35,7 @@ themeCards.forEach(card => {
 themeConfirmBtn.addEventListener('click', () => {
     if (!selectedTheme) return;
     chrome.storage.local.set({ theme: selectedTheme });
-    document.documentElement.setAttribute('data-theme', selectedTheme);
+    document.documentElement.setAttribute('data-daspalecte-theme', selectedTheme);
     showMainPopup();
 });
 
