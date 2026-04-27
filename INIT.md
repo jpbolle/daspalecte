@@ -110,7 +110,7 @@ Google Apps Script (scores)
 - Chrome Web Store en mode **Prive** (groupe `daspa@cnddinant.be`)
 - Eleves DASPA sur Chromebooks scolaires
 
-## Changements v1.7 → en cours
+## Changements v1.8
 
 ### Bouton PDF flottant (Google Drive / Chromebook)
 - Ajout d'un bouton **✕** pour masquer le bouton sans ouvrir le PDF
@@ -127,6 +127,21 @@ Google Apps Script (scores)
 - En-tete PDF viewer : fond blanc carte + ombre legere — etait fond noir avec texte vert illisible
 - Fichiers touches : `themes.css`, `pdfviewer.css`
 
+## Changements v1.9
+
+### Nettoyage CSS themes
+- Remplacement de toutes les couleurs Classica hardcodees dans `content.css` par des variables `var(--t-*)`
+- Concerne : `.daspalecte-speak-btn`, `.daspalecte-magic-btn`, `.capture-speak-btn`, `.capture-text-container`
+
+### Bulle de traduction amelioree
+- Appendice style bulle de BD (triangle CSS `::after`) sous chaque bulle — les 2 themes
+- Icone son blanche en Classica pour meilleure lisibilite sur fond vert
+
+### Popup redessinee
+- Icones d'action (theme, roadmap, info) : emojis remplaces par des SVG dans des cercles bordes
+- Pied de page agrandi : texte plus lisible (0.85rem), logo plus grand (65px)
+- Espacement ajuste entre icones, divider et contenu du footer
+
 ## Bug connu a investiguer
 - Depuis la persistance du sidepanel entre onglets (sync via `chrome.storage.onChanged`), Chrome bloque parfois : la sidebar tremble/bouge puis freeze complet
 - Intermittent, pas systematique
@@ -140,4 +155,4 @@ Google Apps Script (scores)
 4. **Adaptation par niveau CECR** — A1 a C2, complexite ajustee
 5. **Suivi pedagogique** — historique, revisions espacees, stats de progression
 
-## Version actuelle : 1.7
+## Version actuelle : 1.9
