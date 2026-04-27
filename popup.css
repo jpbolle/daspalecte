@@ -11,7 +11,7 @@ body {
 }
 
 .glass-container {
-  padding: 24px;
+  padding: 24px 24px 12px 24px;
   background: var(--t-gradient-bg);
   border: 1px solid var(--t-border);
   min-height: 400px;
@@ -47,29 +47,36 @@ header {
   justify-content: center;
   gap: 12px;
   margin-top: 16px;
+  margin-bottom: 16px;
   padding-top: 12px;
 }
 
 .popup-action-btn {
-  background: none;
-  border: none;
-  color: var(--t-text-dim);
-  width: 36px;
-  height: 36px;
-  border-radius: var(--t-radius);
+  background: var(--t-glass-bg);
+  border: 1.5px solid var(--t-primary-a30);
+  color: var(--t-primary);
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
   cursor: pointer;
-  font-size: 1.1rem;
   display: flex;
   align-items: center;
   justify-content: center;
-  transition: all 0.2s ease;
-  opacity: 0.7;
+  transition: all 0.3s ease;
+  opacity: 0.8;
 }
 
 .popup-action-btn:hover {
-  background: var(--t-glass-bg-hover);
-  color: var(--t-primary);
+  background: var(--t-primary-a15);
+  border-color: var(--t-primary);
   opacity: 1;
+  transform: translateY(-2px);
+  box-shadow: var(--t-shadow-glow);
+}
+
+.popup-action-btn svg {
+  flex-shrink: 0;
+  pointer-events: none;
 }
 
 .button-group {
@@ -176,7 +183,8 @@ header {
 
 .branding-footer {
   margin-top: auto;
-  padding-top: 16px;
+  padding-top: 6px;
+  padding-bottom: 0;
   border-top: 1px solid var(--t-border);
   display: flex;
   flex-direction: row;
@@ -187,16 +195,16 @@ header {
 
 .branding-footer p {
   margin: 0;
-  font-size: 0.7rem;
+  font-size: 0.85rem;
   color: var(--t-primary);
-  opacity: 0.7;
+  opacity: 0.9;
   font-family: var(--t-font-title);
   letter-spacing: 1px;
   white-space: nowrap;
 }
 
 .branding-logo {
-  height: 50px;
+  height: 65px;
   width: auto;
   filter: drop-shadow(0 0 5px rgba(255, 255, 255, 0.2));
 }
