@@ -28,12 +28,13 @@ Une extension Chrome d'aide à la lecture pour les élèves **FLE** (Français L
 - Propulse par **Claude Sonnet 4.5** via une Cloud Function
 
 ### 5. Generation d'exercices
-5 types progressifs a partir des mots de vocabulaire collectes :
-1. **Associations** — relier mot francais / traduction
-2. **Famille de mots** — decouvrir les mots de la meme famille
-3. **Etiquettes** — glisser-deposer le bon mot dans la phrase
-4. **Lecture** — lire un texte contextuel
-5. **Defi final** — texte a trous
+5 types progressifs a partir des mots de vocabulaire collectes, avec seuils de reussite et navigation par points (dots) cliquables si exercice deja reussi (retour arriere ne force plus a refaire) :
+1. **Associations** — relier mot francais / traduction (correction immediate paire par paire, pas de seuil)
+2. **Famille de mots** — carte a effet flip (icone 🔄 seule, recto toujours accessible), saisie des mots lies au verso, traduction au survol des etiquettes recto, seuil : au moins 2 mots trouves
+3. **Etiquettes** — glisser-deposer le bon mot dans la phrase (+ fallback clic/clavier), seuil 80%, bouton "Regenerer" (rappelle Claude) si en dessous, **verification des synonymes par Claude** si une reponse est jugee fausse (evite de rejeter des synonymes valides)
+4. **Lecture** — revelation progressive : texte silencieux cliquable (traduction mot-a-mot) → apres 20s, section Ecouter (synthese vocale avec surbrillance mot-a-mot, pause/vitesse ajustable, ignore les traductions entre parentheses) → apres une lecture complete, section Enregistrer (reconnaissance vocale + alignement pour feedback vert/rouge), passage a la suite impossible sans enregistrement
+5. **Defi final** — texte a trous, seuil 70%, bouton "Recommencer avec indice" (premiere syllabe) si en dessous
+6. **Phrase avec le vocabulaire** *(prevu, pas encore implemente — bloque sur ajout backend)*
 
 ### 6. Test de lecture
 - Genere un test de comprehension (10 QCM + appariement de mots) a partir du texte de la page
@@ -142,6 +143,43 @@ Google Apps Script (scores)
 - Pied de page agrandi : texte plus lisible (0.85rem), logo plus grand (65px)
 - Espacement ajuste entre icones, divider et contenu du footer
 
+## Changements v1.10
+
+### Isolation CSS contre la contamination des pages hotes
+- Cause racine trouvee pour deux bugs recurrents (barre sous la consigne des exercices, chevauchement de la bulle de traduction) : `.exercise-header`, son `h2`, `.ex-desc`, `.exercise-body` et `.daspalecte-translation` etaient des elements generiques sans `all: initial !important`, donc le CSS natif des pages hotes (ex. le soulignement des `<h2>` de Wikipedia) s'appliquait par-dessus notre propre style
+- Meme traitement defensif applique qu'ailleurs dans `content.css` : `all: initial !important` + toutes les proprietes en `!important`
+- Fichiers touches : `content.css`
+
+### Contraste et lisibilite theme Classica
+- Bulle de traduction (hover), icone son (emoji, `color` n'a aucun effet dessus → `filter` utilise a la place), bouton magique ✨ (inverse : vert au repos, blanc au survol avec halo vert sur l'etoile)
+- Nouveaux tokens `--t-text-on-accent` et `--t-accent-ink` : corrige le contraste des badges/etiquettes/QCM sur fond accent et de la traduction en marge PDF
+- `--t-text-muted`/`--t-text-dim` assombris en Classica (echouaient WCAG AA)
+- Retrait des side-stripe borders (anti-pattern) dans 7 composants (popup, sidepanel, pdfviewer, content)
+- Logo du footer heberge localement (`logo-pedagokit.png`) au lieu d'une URL Google Drive externe ; glow adapte en Classica
+
+### Accessibilite clavier
+- Exercices Matching, sélecteur de theme (popup, devient un vrai `radiogroup`), etiquettes drag & drop (fallback clic/clavier en plus du drag natif) : navigables et operables au clavier
+- `aria-label` ajoutes sur les boutons icones (popup, sidepanel, pdfviewer)
+
+### PDF viewer
+- Marges responsive (breakpoints), `fitToWidth()` recalcule au resize
+- Virtualisation : seules les pages proches de l'ecran sont reellement rendues (canvas), via `IntersectionObserver` — le texte est extrait pour toutes les pages des le chargement (necessaire pour comprehension/test de lecture)
+- Verrou anti-course sur le rendu (zoom rapide/resize concurrents)
+
+### Bugs corriges
+- Bouton flottant "Ouvrir avec Daspalecte" apparaissait parfois en double → garde ajoutee dans `showPDFActivationButton()`
+- Boite de comprehension sur page web : ajout d'un bouton reduire (comme le PDF viewer, repli en bulle 📖) ; correction d'un doublon de bulle d'action (le bouton ✨ doit etre masque via `setProperty(..., 'important')`, pas juste `style.display`, a cause du `!important` de la feuille de style)
+- `sidepanel.js` : erreurs "Extension context invalidated" (rechargement de l'extension pendant qu'un onglet reste ouvert) → tous les appels `chrome.storage`/`chrome.identity` proteges par `try/catch`, comme deja fait dans `content.js`
+
+### Backend (Cloud Function, hors de ce repo)
+- Nouvelle action `verify_tags_answers` ajoutee dans `index.js` (Cloud Run "daspalecte", projet `vocabulaire-469115`, region europe-west1) : demande a Claude si une phrase completee par l'eleve reste valide meme si le mot ne correspond pas exactement au mot attendu (evite de rejeter des synonymes) — deployee et testee avec succes
+- Ce code n'a pas de copie locale dans ce repo, uniquement accessible via Google Cloud Console → Cloud Run → onglet Source (editeur en ligne fragile a l'automatisation : prefer telecharger l'archive, corriger en local avec `node --check`, puis coller un diff minimal)
+- Exercice 6 (phrase avec le vocabulaire) reste bloque sur le meme type de dependance backend, reporte
+
+### Skill impeccable
+- Copie depuis le projet "bibliothèque" dans `.claude/skills/impeccable` (design/audit multi-commandes)
+- Audit complet effectue (accessibilite, performance, theming, responsive, anti-patterns) — la plupart des actions prioritaires traitees cette session
+
 ## Bug connu a investiguer
 - Depuis la persistance du sidepanel entre onglets (sync via `chrome.storage.onChanged`), Chrome bloque parfois : la sidebar tremble/bouge puis freeze complet
 - Intermittent, pas systematique
@@ -154,5 +192,8 @@ Google Apps Script (scores)
 3. **Interface professeur** — tableau de bord pour consulter les resultats des eleves
 4. **Adaptation par niveau CECR** — A1 a C2, complexite ajustee
 5. **Suivi pedagogique** — historique, revisions espacees, stats de progression
+6. **Outil de prononciation** — reconnaissance vocale (IA ou non) : l'eleve prononce un mot, comparaison avec la prononciation attendue ; si non reconnu, considere comme mal prononce
+7. **Outil YouTube** — generation d'un test de comprehension (QCM + appariement) a partir du contenu d'une video YouTube, meme principe que le test de lecture actuel sur texte
+8. **Connexion utilisateur** — authentification pour sauvegarder les resultats (au-dela du flux actuel via chrome.identity + Google Sheets)
 
-## Version actuelle : 1.9
+## Version actuelle : 1.10

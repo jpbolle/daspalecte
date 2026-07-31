@@ -16,19 +16,19 @@
     <span id="pdf-title">Daspalecte PDF</span>
   </div>
   <div id="pdf-toolbar-center">
-    <button id="pdf-prev" title="Page précédente">◀</button>
+    <button id="pdf-prev" title="Page précédente" aria-label="Page précédente">◀</button>
     <span id="pdf-page-info">
-      <input type="number" id="pdf-page-input" value="1" min="1"> / <span id="pdf-page-count">-</span>
+      <input type="number" id="pdf-page-input" value="1" min="1" aria-label="Numéro de page"> / <span id="pdf-page-count">-</span>
     </span>
-    <button id="pdf-next" title="Page suivante">▶</button>
+    <button id="pdf-next" title="Page suivante" aria-label="Page suivante">▶</button>
     <span id="pdf-separator">|</span>
-    <button id="pdf-zoom-out" title="Zoom -">−</button>
+    <button id="pdf-zoom-out" title="Zoom -" aria-label="Zoom arrière">−</button>
     <span id="pdf-zoom-level">100%</span>
-    <button id="pdf-zoom-in" title="Zoom +">+</button>
-    <button id="pdf-zoom-fit" title="Ajuster à la largeur">↔</button>
+    <button id="pdf-zoom-in" title="Zoom +" aria-label="Zoom avant">+</button>
+    <button id="pdf-zoom-fit" title="Ajuster à la largeur" aria-label="Ajuster à la largeur">↔</button>
   </div>
   <div id="pdf-toolbar-right">
-    <span id="pdf-scanned-warning" style="display:none;">⚠ PDF scanné — utilisez Capture OCR</span>
+    <span id="pdf-scanned-warning" role="status" aria-live="polite" style="display:none;">⚠ PDF scanné — utilisez Capture OCR</span>
   </div>
 </div>
 

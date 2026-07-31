@@ -212,16 +212,17 @@ input:checked+.slider:before {
     align-items: center;
     gap: 10px;
     background: var(--t-glass-bg);
+    border: 1px solid var(--t-accent-a20);
     padding: 8px 10px;
     border-radius: var(--t-radius-sm);
     margin-bottom: 6px;
     font-size: 0.85rem;
-    border-left: 2px solid var(--t-accent);
-    transition: background 0.2s ease;
+    transition: background 0.2s ease, border-color 0.2s ease;
 }
 
 .word-item:hover {
     background: var(--t-glass-bg-hover);
+    border-color: var(--t-accent-a40);
 }
 
 .word-checkbox {
@@ -450,4 +451,8 @@ input:checked+.slider:before {
     height: 55px;
     width: auto;
     filter: drop-shadow(0 0 8px rgba(255, 255, 255, 0.1));
+}
+
+:root[data-daspalecte-theme="classica"] .branding-logo {
+    filter: drop-shadow(0 2px 6px rgba(61, 56, 50, 0.18));
 }

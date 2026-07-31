@@ -19,6 +19,7 @@ class DaspalecteTranslator {
         this.comprehensionTestPairMap = new Map();
         this.studentEmail = '';
         this.currentTheme = 'cyberpunk';
+        this.readingRate = 0.85; // vitesse de lecture de l'exercice "Lecture" (synthèse vocale)
         this.initTheme();
         this.init();
     }
@@ -88,6 +89,9 @@ class DaspalecteTranslator {
     showPDFActivationButton() {
         // Don't show if we're already in our viewer
         if (location.href.includes(chrome.runtime.id)) return;
+
+        // Éviter un doublon si la fonction est appelée plusieurs fois pour la même page
+        if (document.getElementById('daspalecte-pdf-btn')) return;
 
         const btn = document.createElement('div');
         btn.id = 'daspalecte-pdf-btn';
@@ -579,11 +583,376 @@ class DaspalecteTranslator {
             this.startScreenCapture(message.nativeLanguage);
         } else if (message.type === 'SPEAK_FRENCH') {
             this.speakFrench(message.text);
+        } else if (message.type === 'TTS_WORD_BOUNDARY') {
+            // Un vrai évènement de limite de mot est arrivé : on n'a plus besoin de l'estimation par minuterie
+            this.readingWordBoundaryReceived = true;
+            this.clearReadingFallbackTimer();
+            if (typeof message.charIndex === 'number') {
+                this.advanceReadingHighlightToCharIndex(message.charIndex);
+            } else {
+                this.advanceReadingHighlight();
+            }
+        } else if (message.type === 'TTS_READING_ENDED') {
+            this.finishReadingAloud();
         }
+    }
+
+    // Termine proprement la lecture à voix haute (bouton, surbrillance, révélation de l'enregistrement).
+    // Appelé soit par le vrai évènement 'end' du moteur TTS, soit par le filet de sécurité
+    // scheduleReadingEndFallback() quand ce moteur ne renvoie jamais cet évènement.
+    finishReadingAloud() {
+        this.isReadingAloud = false;
+        this.isReadingPaused = false;
+        this.clearReadingFallbackTimer();
+        this.clearReadingHighlight();
+        this.refreshReadingPlayButton();
+        // Révèle la section d'enregistrement après une première lecture complète (exercice Lecture)
+        if (this.onReadingFinishedOnce) this.onReadingFinishedOnce();
     }
 
     speakFrench(text) {
         chrome.runtime.sendMessage({ type: 'SPEAK_FRENCH', text });
+    }
+
+    // ============================================
+    // EXERCICE LECTURE — synthèse vocale + surbrillance mot-à-mot
+    // ============================================
+
+    escapeHtmlForReading(text) {
+        const div = document.createElement('div');
+        div.textContent = text;
+        return div.innerHTML;
+    }
+
+    // Découpe le texte en mots (spans individuels), en conservant espaces/ponctuation intacts et
+    // en repérant les segments entre parenthèses (traductions) qui ne doivent pas être lus à voix haute.
+    buildReadingWordSpans(text) {
+        const parenRanges = [];
+        const parenRegex = /\([^)]*\)/g;
+        let parenMatch;
+        while ((parenMatch = parenRegex.exec(text)) !== null) {
+            parenRanges.push([parenMatch.index, parenMatch.index + parenMatch[0].length]);
+        }
+        const isInParens = (pos) => parenRanges.some(([start, end]) => pos >= start && pos < end);
+
+        const regex = /[\p{L}\p{M}'’-]+/gu;
+        let html = '';
+        let lastIndex = 0;
+        let match;
+        const words = [];
+
+        while ((match = regex.exec(text)) !== null) {
+            const start = match.index;
+            const end = start + match[0].length;
+            const spoken = !isInParens(start);
+            html += this.escapeHtmlForReading(text.slice(lastIndex, start));
+            html += `<span class="reading-word${spoken ? '' : ' reading-word-translation'}">${this.escapeHtmlForReading(match[0])}</span>`;
+            words.push({ start, end, text: match[0], spoken });
+            lastIndex = end;
+        }
+        html += this.escapeHtmlForReading(text.slice(lastIndex));
+
+        return { html, words };
+    }
+
+    // Repère la position (index de caractère) de chaque mot dans le texte réellement envoyé au
+    // moteur TTS (parenthèses déjà retirées), dans le même ordre que les mots "spoken" de readingWordsData.
+    computeSpokenTextOffsets(spokenText) {
+        const regex = /[\p{L}\p{M}'’-]+/gu;
+        const offsets = [];
+        let match;
+        while ((match = regex.exec(spokenText)) !== null) {
+            offsets.push({ start: match.index, end: match.index + match[0].length });
+        }
+        return offsets;
+    }
+
+    startReadingTTS(text) {
+        this.isReadingAloud = true;
+        this.isReadingPaused = false;
+        this.readingSpokenIndex = -1;
+        this.readingWordBoundaryReceived = false;
+        this.clearReadingFallbackTimer();
+        this.clearReadingHighlight();
+
+        // Ne pas faire lire les traductions entre parenthèses
+        const spokenText = text.replace(/\([^)]*\)/g, ' ');
+        chrome.runtime.sendMessage({ type: 'SPEAK_TEXT_TRACKED', text: spokenText, rate: this.readingRate });
+
+        // Filet de sécurité : certaines voix ne remontent jamais d'évènement de limite de mot.
+        // Si rien n'arrive rapidement, on estime la progression avec une minuterie plutôt que de
+        // n'avoir aucune surbrillance du tout.
+        this.readingFallbackGraceTimeout = setTimeout(() => {
+            if (!this.readingWordBoundaryReceived && this.isReadingAloud) {
+                this.startReadingFallbackTimer();
+            }
+        }, 700);
+    }
+
+    stopReadingTTS() {
+        this.isReadingAloud = false;
+        this.isReadingPaused = false;
+        this.clearReadingFallbackTimer();
+        this.clearReadingHighlight();
+        chrome.runtime.sendMessage({ type: 'STOP_TTS_TRACKED' });
+    }
+
+    pauseReadingTTS() {
+        this.isReadingPaused = true;
+        chrome.runtime.sendMessage({ type: 'PAUSE_TTS_TRACKED' });
+    }
+
+    resumeReadingTTS() {
+        this.isReadingPaused = false;
+        chrome.runtime.sendMessage({ type: 'RESUME_TTS_TRACKED' });
+    }
+
+    refreshReadingPlayButton() {
+        if (!this.currentReadingPlayBtn) return;
+        if (!this.isReadingAloud) {
+            this.currentReadingPlayBtn.innerHTML = '🔊 Lire le texte';
+        } else if (this.isReadingPaused) {
+            this.currentReadingPlayBtn.innerHTML = '▶ Reprendre';
+        } else {
+            this.currentReadingPlayBtn.innerHTML = '⏸ Pause';
+        }
+    }
+
+    // Estimation grossière du temps de prononciation d'un mot : proportionnelle à sa longueur
+    // (un mot court se dit plus vite qu'un mot long), calée sur ~175 mots/minute à vitesse 1x.
+    // Approximation sans aucun retour réel de la voix — ne peut pas être parfaitement synchronisée.
+    estimateWordDurationMs(word) {
+        const baseMsPerWord = 60000 / (175 * this.readingRate);
+        const lengthFactor = Math.max(0.6, Math.min(2, word.length / 5));
+        return baseMsPerWord * lengthFactor;
+    }
+
+    // Estimation de la progression par minuterie, pour les voix qui ne remontent pas
+    // d'évènements de limite de mot (fallback silencieux, pas d'échec visible pour l'élève)
+    startReadingFallbackTimer() {
+        this.clearReadingFallbackTimer();
+
+        const scheduleNext = () => {
+            if (this.isReadingPaused) {
+                this.readingFallbackTimer = setTimeout(scheduleNext, 150);
+                return;
+            }
+            this.advanceReadingHighlight();
+            if (!this.readingWordsData || this.readingSpokenIndex >= this.readingWordsData.length - 1) {
+                this.readingFallbackTimer = null;
+                return;
+            }
+            const nextWord = this.readingWordsData[this.readingSpokenIndex + 1];
+            this.readingFallbackTimer = setTimeout(scheduleNext, this.estimateWordDurationMs(nextWord.text));
+        };
+
+        scheduleNext();
+    }
+
+    clearReadingFallbackTimer() {
+        if (this.readingFallbackTimer) {
+            clearTimeout(this.readingFallbackTimer);
+            this.readingFallbackTimer = null;
+        }
+        if (this.readingFallbackGraceTimeout) {
+            clearTimeout(this.readingFallbackGraceTimeout);
+            this.readingFallbackGraceTimeout = null;
+        }
+        if (this.readingEndFallbackTimer) {
+            clearTimeout(this.readingEndFallbackTimer);
+            this.readingEndFallbackTimer = null;
+        }
+    }
+
+    // Filet de sécurité : certaines voix ne renvoient jamais d'évènement 'end' (ni 'interrupted',
+    // ni 'error') après avoir prononcé le dernier mot, ce qui bloquait la suite de l'exercice
+    // (bouton coincé sur "Pause", enregistrement jamais révélé). On force la fin de lecture nous-même
+    // peu après avoir surligné le dernier mot, si aucun véritable évènement de fin n'est arrivé entretemps.
+    scheduleReadingEndFallback() {
+        if (this.readingEndFallbackTimer) clearTimeout(this.readingEndFallbackTimer);
+        const lastWord = this.readingWordsData[this.readingWordsData.length - 1];
+        const buffer = (lastWord ? this.estimateWordDurationMs(lastWord.text) : 600) + 900;
+        this.readingEndFallbackTimer = setTimeout(() => {
+            this.readingEndFallbackTimer = null;
+            if (this.isReadingAloud) this.finishReadingAloud();
+        }, buffer);
+    }
+
+    // Avance la surbrillance au mot suivant réellement prononcé (parenthèses déjà exclues en amont)
+    advanceReadingHighlight() {
+        if (!this.readingWordsData || !this.readingWordsData.length) return;
+        this.readingSpokenIndex++;
+        this.clearReadingHighlight();
+        const word = this.readingWordsData[this.readingSpokenIndex];
+        if (word && word.element) {
+            word.element.classList.add('reading-word-active');
+            word.element.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+        }
+        if (this.readingSpokenIndex >= this.readingWordsData.length - 1) {
+            this.scheduleReadingEndFallback();
+        }
+    }
+
+    clearReadingHighlight() {
+        if (!this.readingWordsData) return;
+        this.readingWordsData.forEach(w => w.element.classList.remove('reading-word-active'));
+    }
+
+    // Resynchronise directement sur la position de caractère rapportée par le moteur TTS, plutôt que
+    // d'avancer d'un cran par évènement : ainsi un mot fusionné/scindé par le moteur vocal ne fait pas
+    // dériver le surlignage au fil de la lecture (il se recale automatiquement à chaque évènement).
+    advanceReadingHighlightToCharIndex(charIndex) {
+        if (!this.readingWordsData || !this.readingWordsData.length) return;
+        let idx = this.readingWordsData.findIndex(w => w.spokenStart !== undefined && w.spokenStart > charIndex);
+        idx = idx === -1 ? this.readingWordsData.length - 1 : Math.max(0, idx - 1);
+        if (idx <= this.readingSpokenIndex) return; // ne jamais revenir en arrière
+        this.readingSpokenIndex = idx;
+        this.clearReadingHighlight();
+        const word = this.readingWordsData[idx];
+        if (word && word.element) {
+            word.element.classList.add('reading-word-active');
+            word.element.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+        }
+        if (idx >= this.readingWordsData.length - 1) {
+            this.scheduleReadingEndFallback();
+        }
+    }
+
+    // Arrête toute lecture/enregistrement en cours (changement d'exercice, fermeture de l'overlay)
+    stopReadingActivity() {
+        if (this.isReadingAloud) {
+            this.stopReadingTTS();
+        }
+        if (this.isRecordingReading && this.currentReadingRecognition) {
+            this.currentReadingRecognition.stop();
+        }
+        if (this.readingRevealTimeout) {
+            clearTimeout(this.readingRevealTimeout);
+            this.readingRevealTimeout = null;
+        }
+        this.onReadingFinishedOnce = null;
+    }
+
+    // --- Enregistrement de la lecture de l'élève (reconnaissance vocale + alignement) ---
+
+    toggleReadingRecording(button, feedbackEl, onComplete) {
+        if (this.isRecordingReading) {
+            this.currentReadingRecognition && this.currentReadingRecognition.stop();
+            return;
+        }
+        this.startReadingRecording(button, feedbackEl, onComplete);
+    }
+
+    startReadingRecording(button, feedbackEl, onComplete) {
+        const SpeechRecognitionCtor = window.SpeechRecognition || window.webkitSpeechRecognition;
+        if (!SpeechRecognitionCtor) {
+            feedbackEl.style.display = 'block';
+            feedbackEl.textContent = "La reconnaissance vocale n'est pas disponible sur ce navigateur.";
+            return;
+        }
+
+        // Une seule activité (lecture ou enregistrement) à la fois
+        this.stopReadingTTS();
+        this.refreshReadingPlayButton();
+
+        const recognition = new SpeechRecognitionCtor();
+        recognition.lang = 'fr-FR';
+        recognition.continuous = true;
+        recognition.interimResults = false;
+
+        let finalTranscript = '';
+
+        recognition.onresult = (event) => {
+            for (let i = event.resultIndex; i < event.results.length; i++) {
+                if (event.results[i].isFinal) {
+                    finalTranscript += event.results[i][0].transcript + ' ';
+                }
+            }
+        };
+
+        recognition.onerror = (event) => {
+            console.error('[CONTENT] Erreur reconnaissance vocale:', event.error);
+            feedbackEl.style.display = 'block';
+            feedbackEl.textContent = event.error === 'not-allowed'
+                ? "Micro refusé — autorise l'accès au micro pour utiliser cette fonction."
+                : 'Erreur de reconnaissance vocale, réessaie.';
+        };
+
+        recognition.onend = () => {
+            this.isRecordingReading = false;
+            this.currentReadingRecognition = null;
+            button.classList.remove('recording');
+            button.innerHTML = '🎤 Enregistrer ma lecture';
+            if (finalTranscript.trim()) {
+                this.showReadingPronunciationFeedback(finalTranscript.trim(), feedbackEl);
+            }
+            // L'élève s'est enregistré (que la reconnaissance ait ou non capté du texte)
+            if (onComplete) onComplete();
+        };
+
+        this.currentReadingRecognition = recognition;
+        this.isRecordingReading = true;
+        button.classList.add('recording');
+        button.innerHTML = "⏹ Arrêter l'enregistrement";
+        feedbackEl.style.display = 'none';
+        recognition.start();
+    }
+
+    normalizeReadingWord(word) {
+        return word
+            .toLowerCase()
+            .normalize('NFD').replace(/[̀-ͯ]/g, '')
+            .replace(/[^a-z0-9']/g, '');
+    }
+
+    // Alignement mot-à-mot (plus longue sous-séquence commune) entre le texte de référence
+    // et la transcription reconnue — ne nécessite aucun appel IA.
+    alignReadingWords(referenceWords, recognizedWords) {
+        const ref = referenceWords.map(w => this.normalizeReadingWord(w));
+        const rec = recognizedWords.map(w => this.normalizeReadingWord(w));
+        const m = ref.length, n = rec.length;
+        const dp = Array.from({ length: m + 1 }, () => new Array(n + 1).fill(0));
+
+        for (let i = 1; i <= m; i++) {
+            for (let j = 1; j <= n; j++) {
+                if (ref[i - 1] && ref[i - 1] === rec[j - 1]) {
+                    dp[i][j] = dp[i - 1][j - 1] + 1;
+                } else {
+                    dp[i][j] = Math.max(dp[i - 1][j], dp[i][j - 1]);
+                }
+            }
+        }
+
+        const matched = new Array(m).fill(false);
+        let i = m, j = n;
+        while (i > 0 && j > 0) {
+            if (ref[i - 1] && ref[i - 1] === rec[j - 1]) {
+                matched[i - 1] = true;
+                i--; j--;
+            } else if (dp[i - 1][j] >= dp[i][j - 1]) {
+                i--;
+            } else {
+                j--;
+            }
+        }
+        return matched;
+    }
+
+    showReadingPronunciationFeedback(transcript, feedbackEl) {
+        if (!this.readingWordsData) return;
+
+        const recognizedWords = transcript.split(/\s+/).filter(Boolean);
+        const referenceWords = this.readingWordsData.map(w => w.text);
+        const matched = this.alignReadingWords(referenceWords, recognizedWords);
+
+        this.readingWordsData.forEach((w, idx) => {
+            w.element.classList.remove('reading-correct', 'reading-incorrect');
+            w.element.classList.add(matched[idx] ? 'reading-correct' : 'reading-incorrect');
+        });
+
+        const correctCount = matched.filter(Boolean).length;
+        feedbackEl.style.display = 'block';
+        feedbackEl.textContent = `${correctCount} / ${referenceWords.length} mots bien reconnus`;
     }
 
     async loadSettings() {
@@ -950,11 +1319,12 @@ class DaspalecteTranslator {
     async handleMagicButtonClick(paragraph, button, summaryCol) {
         if (button.disabled) return;
 
-        // Si le résumé est déjà affiché, on le masque (toggle)
+        // Si le résumé est déjà affiché (ouvert ou réduit), on le referme complètement (toggle)
         if (summaryCol.classList.contains('active')) {
-            summaryCol.classList.remove('active');
+            summaryCol.classList.remove('active', 'collapsed');
             summaryCol.innerHTML = '';
             button.innerHTML = '✨';
+            button.style.removeProperty('display');
             return;
         }
 
@@ -970,7 +1340,10 @@ class DaspalecteTranslator {
                 <div class="daspalecte-summary-box">
                     <div class="summary-header">
                         <span>Aide à la compréhension</span>
-                        <button class="summary-close">×</button>
+                        <div class="summary-actions">
+                            <button class="summary-minimize" title="Réduire">—</button>
+                            <button class="summary-close" title="Fermer">×</button>
+                        </div>
                     </div>
                     <div class="summary-content">
                         <div class="summary-section">
@@ -986,13 +1359,12 @@ class DaspalecteTranslator {
             `;
 
             summaryCol.classList.add('active');
-            summaryCol.querySelector('.summary-close').onclick = () => {
-                summaryCol.classList.remove('active');
-                summaryCol.innerHTML = '';
-                button.innerHTML = '✨';
-            };
+            this.attachSummaryBoxHandlers(summaryCol, button);
 
+            // Une seule bulle d'action à la fois par paragraphe : l'encadré (ouvert ou réduit)
+            // remplace le bouton magique tant qu'il existe.
             button.innerHTML = '✦'; // Icone alternative pour état "actif"
+            button.style.setProperty('display', 'none', 'important');
         } catch (error) {
             console.error('Erreur de résumé AI:', error);
             button.innerHTML = '❌';
@@ -1000,6 +1372,44 @@ class DaspalecteTranslator {
         } finally {
             button.disabled = false;
         }
+    }
+
+    // Attache les handlers close/réduire de la boîte de compréhension (page web)
+    attachSummaryBoxHandlers(summaryCol, button) {
+        const closeBtn = summaryCol.querySelector('.summary-close');
+        if (closeBtn) {
+            closeBtn.onclick = () => {
+                summaryCol.classList.remove('active', 'collapsed');
+                summaryCol.innerHTML = '';
+                button.innerHTML = '✨';
+                button.style.removeProperty('display');
+            };
+        }
+        const minimizeBtn = summaryCol.querySelector('.summary-minimize');
+        if (minimizeBtn) {
+            minimizeBtn.onclick = () => {
+                this.collapseSummaryBox(summaryCol, button);
+            };
+        }
+    }
+
+    // Réduit la boîte de compréhension en une petite bulle (garde le contenu pour la ré-ouvrir)
+    collapseSummaryBox(summaryCol, button) {
+        summaryCol._fullContent = summaryCol.innerHTML;
+        summaryCol.classList.add('collapsed');
+        summaryCol.innerHTML = '<span class="summary-bubble" title="Aide à la compréhension">📖</span>';
+        summaryCol.querySelector('.summary-bubble').addEventListener('click', (e) => {
+            e.stopPropagation();
+            this.expandSummaryBox(summaryCol, button);
+        });
+    }
+
+    // Ré-ouvre une boîte de compréhension réduite
+    expandSummaryBox(summaryCol, button) {
+        if (!summaryCol.classList.contains('collapsed')) return;
+        summaryCol.classList.remove('collapsed');
+        summaryCol.innerHTML = summaryCol._fullContent;
+        this.attachSummaryBoxHandlers(summaryCol, button);
     }
 
     async getAISummary(text, nativeLang) {
@@ -1072,7 +1482,7 @@ class DaspalecteTranslator {
             }
 
             const data = await response.json();
-            this.displayExercises(data.exercises);
+            this.displayExercises(data.exercises, words, targetLang);
         } catch (error) {
             console.error('Erreur exercices:', error);
             alert('Erreur lors de la préparation des exercices.');
@@ -1102,6 +1512,7 @@ class DaspalecteTranslator {
     closeExerciseOverlay() {
         const existing = document.getElementById('daspalecte-exercise-overlay');
         if (existing) {
+            this.stopReadingActivity();
             existing.remove();
 
             // Restaurer l'état du traducteur s'il était actif avant les exercices
@@ -1121,15 +1532,17 @@ class DaspalecteTranslator {
         }
     }
 
-    displayExercises(exercises) {
+    displayExercises(exercises, words, targetLang) {
         const overlay = document.getElementById('daspalecte-exercise-overlay');
         if (!overlay) return;
 
         let currentStep = 0;
+        const completedSteps = new Set(); // exercices déjà réussis au moins une fois
         const content = overlay.querySelector('.overlay-content');
         content.classList.remove('loader-active');
 
         const renderStep = () => {
+            this.stopReadingActivity();
             const ex = exercises[currentStep];
             content.innerHTML = `
                 <div class="exercise-container">
@@ -1144,10 +1557,8 @@ class DaspalecteTranslator {
                             <button id="btn-prev" class="ex-btn secondary" ${currentStep === 0 ? 'disabled' : ''}>
                                 ← Précédent
                             </button>
-                            <button id="btn-skip" class="ex-btn secondary" ${currentStep === exercises.length - 1 ? 'disabled' : ''}>
-                                Suivant →
-                            </button>
                         </div>
+                        <div class="exercise-dots" id="exercise-dots"></div>
                         <div class="action-buttons">
                             <button id="btn-check" class="ex-btn primary">Vérifier</button>
                             <button id="btn-next" class="ex-btn primary" style="display:none">Continuer</button>
@@ -1162,11 +1573,65 @@ class DaspalecteTranslator {
             const btnNext = content.querySelector('#btn-next');
             const btnCheck = content.querySelector('#btn-check');
             const btnPrev = content.querySelector('#btn-prev');
-            const btnSkip = content.querySelector('#btn-skip');
+            const dotsEl = content.querySelector('#exercise-dots');
 
-            this.renderExerciseType(ex, body, btnCheck, btnNext);
+            // Points de navigation : cliquables seulement pour l'exercice courant ou déjà réussi
+            exercises.forEach((_, idx) => {
+                const dot = document.createElement('button');
+                dot.type = 'button';
+                dot.className = 'exercise-dot';
+                if (idx === currentStep) dot.classList.add('active');
+                if (completedSteps.has(idx)) dot.classList.add('completed');
+                const clickable = idx === currentStep || completedSteps.has(idx);
+                dot.disabled = !clickable;
+                dot.setAttribute('aria-label', `Exercice ${idx + 1}${completedSteps.has(idx) ? ' (terminé)' : ''}`);
+                dot.addEventListener('click', () => {
+                    if (!clickable) return;
+                    currentStep = idx;
+                    renderStep();
+                });
+                dotsEl.appendChild(dot);
+            });
 
-            // Navigation : Précédent
+            // Régénère uniquement l'exercice courant via le Cloud Function existant (generate_exercises),
+            // sans réinitialiser la progression sur les autres exercices.
+            const regenerateCurrentExercise = async () => {
+                body.innerHTML = `
+                    <div class="loader-container">
+                        <div class="neon-spinner"></div>
+                        <p>Claude régénère cet exercice...</p>
+                    </div>
+                `;
+                try {
+                    const response = await fetch('https://daspalecte-1086562672385.europe-west1.run.app', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            action: 'generate_exercises',
+                            list: words,
+                            targetLanguage: targetLang
+                        })
+                    });
+                    if (!response.ok) throw new Error('Erreur lors de la régénération');
+                    const data = await response.json();
+                    const currentType = exercises[currentStep].type;
+                    exercises[currentStep] = data.exercises.find(e => e.type === currentType) || data.exercises[currentStep];
+                    renderStep();
+                } catch (error) {
+                    console.error('[CONTENT] Erreur régénération exercice:', error);
+                    body.innerHTML = '<p class="ex-score ex-score-fail">Impossible de régénérer l\'exercice, réessaie.</p>';
+                }
+            };
+
+            this.renderExerciseType(ex, body, btnCheck, btnNext, regenerateCurrentExercise);
+
+            // Un exercice déjà réussi ne redevient pas obligatoire en y revenant :
+            // "Continuer" reste disponible même si l'élève ne le refait pas.
+            if (completedSteps.has(currentStep)) {
+                btnNext.style.display = 'block';
+            }
+
+            // Navigation : Précédent (toujours possible)
             btnPrev.onclick = () => {
                 if (currentStep > 0) {
                     currentStep--;
@@ -1174,16 +1639,9 @@ class DaspalecteTranslator {
                 }
             };
 
-            // Navigation : Suivant (sauter sans vérifier)
-            btnSkip.onclick = () => {
-                if (currentStep < exercises.length - 1) {
-                    currentStep++;
-                    renderStep();
-                }
-            };
-
-            // Bouton "Continuer" après vérification réussie
+            // Bouton "Continuer" — n'apparaît que lorsque l'exercice courant est réussi
             btnNext.onclick = () => {
+                completedSteps.add(currentStep);
                 currentStep++;
                 if (currentStep < exercises.length) {
                     renderStep();
@@ -1196,10 +1654,10 @@ class DaspalecteTranslator {
         renderStep();
     }
 
-    renderExerciseType(ex, container, btnCheck, btnNext) {
+    renderExerciseType(ex, container, btnCheck, btnNext, regenerateCurrentExercise) {
         switch (ex.type) {
             case 'matching': this.renderMatching(ex, container, btnCheck, btnNext); break;
-            case 'tags': this.renderTags(ex, container, btnCheck, btnNext); break;
+            case 'tags': this.renderTags(ex, container, btnCheck, btnNext, regenerateCurrentExercise); break;
             case 'reading': this.renderReading(ex, container, btnCheck, btnNext); break;
             case 'family': this.renderFamily(ex, container, btnCheck, btnNext); break;
             case 'cloze': this.renderCloze(ex, container, btnCheck, btnNext); break;
@@ -1231,13 +1689,23 @@ class DaspalecteTranslator {
             el.className = 'match-item';
             el.textContent = pair.fr;
             el.dataset.val = pair.fr;
-            el.onclick = () => {
+            el.tabIndex = 0;
+            el.setAttribute('role', 'button');
+            el.setAttribute('aria-label', pair.fr);
+            const handleSelect = () => {
                 if (el.classList.contains('matched')) return;
                 colFr.querySelectorAll('.match-item').forEach(i => i.classList.remove('selected'));
                 el.classList.add('selected');
                 selectedFr = pair.fr;
                 checkMatch();
             };
+            el.onclick = handleSelect;
+            el.addEventListener('keydown', (e) => {
+                if (e.key === 'Enter' || e.key === ' ') {
+                    e.preventDefault();
+                    handleSelect();
+                }
+            });
             colFr.appendChild(el);
         });
 
@@ -1246,13 +1714,23 @@ class DaspalecteTranslator {
             el.className = 'match-item';
             el.textContent = pair.tr;
             el.dataset.val = pair.fr; // On stocke la clé FR pour vérifier
-            el.onclick = () => {
+            el.tabIndex = 0;
+            el.setAttribute('role', 'button');
+            el.setAttribute('aria-label', pair.tr);
+            const handleSelect = () => {
                 if (el.classList.contains('matched')) return;
                 colTr.querySelectorAll('.match-item').forEach(i => i.classList.remove('selected'));
                 el.classList.add('selected');
                 selectedTr = pair.fr;
                 checkMatch();
             };
+            el.onclick = handleSelect;
+            el.addEventListener('keydown', (e) => {
+                if (e.key === 'Enter' || e.key === ' ') {
+                    e.preventDefault();
+                    handleSelect();
+                }
+            });
             colTr.appendChild(el);
         });
 
@@ -1285,10 +1763,12 @@ class DaspalecteTranslator {
         };
 
         btnCheck.style.display = 'none';
+        btnNext.style.display = 'none';
     }
 
-    renderTags(ex, container, btnCheck, btnNext) {
+    renderTags(ex, container, btnCheck, btnNext, regenerateExercise) {
         let answers = {}; // { itemIndex: selectedWord }
+        let selectedTag = null; // étiquette armée pour un placement au clic/clavier
         const totalItems = ex.items.length;
 
         container.innerHTML = `
@@ -1296,84 +1776,11 @@ class DaspalecteTranslator {
                 <div class="sentences-list" id="sentences"></div>
                 <div class="tags-pool" id="pool"></div>
             </div>
+            <div class="ex-result" id="tags-result" style="display:none;"></div>
         `;
 
         const sentencesDiv = container.querySelector('#sentences');
         const poolDiv = container.querySelector('#pool');
-
-        // Créer les phrases avec des zones de dépôt (drag & drop)
-        ex.items.forEach((item, idx) => {
-            const div = document.createElement('div');
-            div.className = 'sentence-item';
-
-            // On remplace ___ par un span interactif
-            const htmlText = item.sentence.replace('___', `<span class="drop-zone" data-idx="${idx}">...</span>`);
-            div.innerHTML = `<span class="bullet">${idx + 1}</span> ${htmlText}`;
-            sentencesDiv.appendChild(div);
-
-            const dropZone = div.querySelector('.drop-zone');
-
-            // Vérifier que la drop-zone existe (la phrase doit contenir ___)
-            if (!dropZone) {
-                console.warn(`[CONTENT] ⚠️ Pas de zone de dépôt pour l'item ${idx}: "${item.sentence}"`);
-                return; // Passer à l'item suivant
-            }
-
-            // Drag & Drop events
-            dropZone.addEventListener('dragover', (e) => {
-                e.preventDefault();
-                dropZone.style.background = this.getThemeColors().primaryAlpha20;
-            });
-
-            dropZone.addEventListener('dragleave', () => {
-                dropZone.style.background = '';
-            });
-
-            dropZone.addEventListener('drop', (e) => {
-                e.preventDefault();
-                dropZone.style.background = '';
-
-                const word = e.dataTransfer.getData('text/plain');
-                const tagElement = poolDiv.querySelector(`[data-word="${word}"]`);
-
-                if (tagElement) {
-                    // Si la zone contient déjà un mot, le remettre dans le pool
-                    if (answers[idx]) {
-                        const oldTag = document.createElement('div');
-                        oldTag.className = 'tag-item';
-                        oldTag.textContent = answers[idx];
-                        oldTag.draggable = true;
-                        oldTag.dataset.word = answers[idx];
-                        setupTagDrag(oldTag);
-                        poolDiv.appendChild(oldTag);
-                    }
-
-                    // Placer le nouveau mot
-                    answers[idx] = word;
-                    dropZone.textContent = word;
-                    dropZone.classList.add('filled');
-                    tagElement.remove();
-                }
-            });
-
-            // Clic pour retirer un mot
-            dropZone.addEventListener('click', () => {
-                if (answers[idx]) {
-                    // Remettre le mot dans le pool
-                    const tag = document.createElement('div');
-                    tag.className = 'tag-item';
-                    tag.textContent = answers[idx];
-                    tag.draggable = true;
-                    tag.dataset.word = answers[idx];
-                    setupTagDrag(tag);
-                    poolDiv.appendChild(tag);
-
-                    delete answers[idx];
-                    dropZone.textContent = '...';
-                    dropZone.classList.remove('filled');
-                }
-            });
-        });
 
         // Fonction pour configurer le drag d'une étiquette
         const setupTagDrag = (tag) => {
@@ -1387,21 +1794,141 @@ class DaspalecteTranslator {
             });
         };
 
-        // Créer le pool d'étiquettes (mélangé) avec drag & drop
-        const words = ex.items.map(item => item.word).sort(() => Math.random() - 0.5);
-        words.forEach(word => {
+        // Sélectionner/désélectionner une étiquette (mode clic/clavier, alternative au drag & drop)
+        const selectTag = (tag) => {
+            if (selectedTag === tag) {
+                tag.classList.remove('selected');
+                selectedTag = null;
+                return;
+            }
+            if (selectedTag) {
+                selectedTag.classList.remove('selected');
+            }
+            selectedTag = tag;
+            tag.classList.add('selected');
+        };
+
+        // Crée une étiquette (pool initial + remise dans le pool) avec drag, clic et clavier
+        const createTag = (word) => {
             const tag = document.createElement('div');
             tag.className = 'tag-item';
             tag.textContent = word;
             tag.draggable = true;
             tag.dataset.word = word;
+            tag.tabIndex = 0;
+            tag.setAttribute('role', 'button');
+            tag.setAttribute('aria-label', `Étiquette : ${word}`);
             setupTagDrag(tag);
-            poolDiv.appendChild(tag);
+            tag.addEventListener('click', () => selectTag(tag));
+            tag.addEventListener('keydown', (e) => {
+                if (e.key === 'Enter' || e.key === ' ') {
+                    e.preventDefault();
+                    selectTag(tag);
+                }
+            });
+            return tag;
+        };
+
+        // Placer l'étiquette sélectionnée dans une zone, ou en retirer le mot déjà présent
+        const placeOrClear = (idx, dropZone) => {
+            if (selectedTag) {
+                const word = selectedTag.dataset.word;
+                if (answers[idx]) {
+                    poolDiv.appendChild(createTag(answers[idx]));
+                }
+                answers[idx] = word;
+                dropZone.textContent = word;
+                dropZone.classList.add('filled');
+                selectedTag.remove();
+                selectedTag = null;
+                return;
+            }
+            if (answers[idx]) {
+                poolDiv.appendChild(createTag(answers[idx]));
+                delete answers[idx];
+                dropZone.textContent = '...';
+                dropZone.classList.remove('filled');
+            }
+        };
+
+        // Créer les phrases avec des zones de dépôt (drag & drop, clic ou clavier)
+        ex.items.forEach((item, idx) => {
+            const div = document.createElement('div');
+            div.className = 'sentence-item';
+
+            // On remplace ___ par un span interactif
+            const htmlText = item.sentence.replace('___', `<span class="drop-zone" data-idx="${idx}" tabindex="0" role="button" aria-label="Zone à compléter">...</span>`);
+            div.innerHTML = `<span class="bullet">${idx + 1}</span> ${htmlText}`;
+            sentencesDiv.appendChild(div);
+
+            const dropZone = div.querySelector('.drop-zone');
+
+            // Vérifier que la drop-zone existe (la phrase doit contenir ___)
+            if (!dropZone) {
+                console.warn(`[CONTENT] ⚠️ Pas de zone de dépôt pour l'item ${idx}: "${item.sentence}"`);
+                return; // Passer à l'item suivant
+            }
+
+            // Drag & Drop events (souris)
+            dropZone.addEventListener('dragover', (e) => {
+                e.preventDefault();
+                dropZone.style.background = this.getThemeColors().primaryAlpha20;
+            });
+
+            dropZone.addEventListener('dragleave', () => {
+                dropZone.style.background = '';
+            });
+
+            dropZone.addEventListener('drop', (e) => {
+                e.preventDefault();
+                dropZone.style.background = '';
+
+                if (selectedTag) {
+                    selectedTag.classList.remove('selected');
+                    selectedTag = null;
+                }
+
+                const word = e.dataTransfer.getData('text/plain');
+                const tagElement = poolDiv.querySelector(`[data-word="${word}"]`);
+
+                if (tagElement) {
+                    // Si la zone contient déjà un mot, le remettre dans le pool
+                    if (answers[idx]) {
+                        poolDiv.appendChild(createTag(answers[idx]));
+                    }
+
+                    // Placer le nouveau mot
+                    answers[idx] = word;
+                    dropZone.textContent = word;
+                    dropZone.classList.add('filled');
+                    tagElement.remove();
+                }
+            });
+
+            // Clic ou clavier (Entrée/Espace) : placer l'étiquette sélectionnée, ou retirer le mot présent
+            dropZone.addEventListener('click', () => placeOrClear(idx, dropZone));
+            dropZone.addEventListener('keydown', (e) => {
+                if (e.key === 'Enter' || e.key === ' ') {
+                    e.preventDefault();
+                    placeOrClear(idx, dropZone);
+                }
+            });
         });
 
+        // Créer le pool d'étiquettes (mélangé) avec drag & drop, clic et clavier
+        const words = ex.items.map(item => item.word).sort(() => Math.random() - 0.5);
+        words.forEach(word => {
+            poolDiv.appendChild(createTag(word));
+        });
+
+        const resultEl = container.querySelector('#tags-result');
+
         btnCheck.style.display = 'block';
-        btnCheck.onclick = () => {
+        btnCheck.onclick = async () => {
+            btnCheck.disabled = true;
             let correctCount = 0;
+            const wrongItems = []; // réponses ne correspondant pas au mot exact attendu
+
             ex.items.forEach((item, idx) => {
                 const zone = container.querySelector(`.drop-zone[data-idx="${idx}"]`);
 
@@ -1411,81 +1938,383 @@ class DaspalecteTranslator {
                     return; // Passer à l'item suivant
                 }
 
+                zone.classList.remove('correct', 'error');
                 if (answers[idx] === item.word) {
                     zone.classList.add('correct');
                     correctCount++;
                 } else {
                     zone.classList.add('error');
+                    if (answers[idx]) {
+                        wrongItems.push({ zone, sentence: item.sentence.replace('___', answers[idx]) });
+                    }
                 }
             });
 
-            if (correctCount === totalItems) {
+            // Un mot différent du mot exact attendu peut être un synonyme valide (ex. "hommes"/"personnes") :
+            // on demande un second avis à Claude avant de trancher, plutôt que de rejeter en bloc.
+            if (wrongItems.length > 0) {
+                resultEl.style.display = 'block';
+                resultEl.innerHTML = '<p class="ex-score">Claude vérifie tes réponses...</p>';
+                try {
+                    const response = await fetch('https://daspalecte-1086562672385.europe-west1.run.app', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            action: 'verify_tags_answers',
+                            items: wrongItems.map(w => ({ sentence: w.sentence }))
+                        })
+                    });
+                    if (response.ok) {
+                        const data = await response.json();
+                        (data.results || []).forEach((result, i) => {
+                            if (result && result.valid) {
+                                wrongItems[i].zone.classList.remove('error');
+                                wrongItems[i].zone.classList.add('correct');
+                                correctCount++;
+                            }
+                        });
+                    }
+                } catch (error) {
+                    console.error('[CONTENT] Erreur vérification IA des étiquettes:', error);
+                    // Pas de blocage : on garde le résultat de la vérification stricte en cas d'échec
+                }
+            }
+
+            btnCheck.disabled = false;
+            const accuracy = totalItems > 0 ? correctCount / totalItems : 1;
+
+            if (accuracy >= 0.7) {
                 btnNext.style.display = 'block';
                 btnCheck.style.display = 'none';
+                // .ex-result a un `display: flex !important` en CSS qui écraserait un simple
+                // style.display = 'none' : la boîte resterait visible avec son dernier contenu
+                // (ex. "Claude vérifie tes réponses..."). setProperty(...'important') est nécessaire.
+                resultEl.style.setProperty('display', 'none', 'important');
+                resultEl.innerHTML = '';
             } else {
                 setTimeout(() => {
                     container.querySelectorAll('.drop-zone.error').forEach(z => {
                         z.classList.remove('error');
                     });
                 }, 2000);
+
+                resultEl.style.display = 'block';
+                resultEl.innerHTML = `
+                    <p class="ex-score ex-score-fail">${Math.round(accuracy * 100)}% de bonnes réponses — il faut au moins 70% pour continuer.</p>
+                    <button type="button" class="ex-btn secondary ex-regenerate-btn">✨ Régénérer l'exercice</button>
+                `;
+                resultEl.querySelector('.ex-regenerate-btn').onclick = () => {
+                    if (regenerateExercise) regenerateExercise();
+                };
             }
         };
     }
 
+    // Bulle de traduction au clic sur un mot de la lecture silencieuse (réutilise le style
+    // de bulle du traducteur principal, sans toucher à son état interne)
+    attachReadingWordTranslation(container) {
+        const translationCache = new Map();
+        container.querySelectorAll('.reading-word:not(.reading-word-translation)').forEach(wordEl => {
+            wordEl.addEventListener('click', async () => {
+                const existing = wordEl.querySelector('.daspalecte-translation');
+                if (existing) {
+                    existing.remove();
+                    return;
+                }
+                // Une seule bulle affichée à la fois
+                container.querySelectorAll('.daspalecte-translation').forEach(b => b.remove());
+
+                const word = wordEl.textContent;
+                if (!translationCache.has(word)) {
+                    try {
+                        translationCache.set(word, await this.translateText(word));
+                    } catch (e) {
+                        translationCache.set(word, null);
+                    }
+                }
+                const translation = translationCache.get(word);
+                if (!translation) return;
+
+                const bubble = document.createElement('span');
+                bubble.className = 'daspalecte-translation';
+                bubble.textContent = translation;
+                wordEl.appendChild(bubble);
+            });
+        });
+
+        // Filet de sécurité : un clic ailleurs dans l'exercice referme aussi la bulle ouverte
+        container.addEventListener('click', (e) => {
+            if (e.target.closest('.reading-word')) return; // déjà géré par le mot cliqué lui-même
+            container.querySelectorAll('.daspalecte-translation').forEach(b => b.remove());
+        });
+    }
+
     renderReading(ex, container, btnCheck, btnNext) {
-        container.innerHTML = `<div class="reading-text">${ex.text}</div>`;
-        btnNext.style.display = 'block';
+        const { html, words } = this.buildReadingWordSpans(ex.text);
+
+        container.innerHTML = `
+            <div class="reading-text" id="reading-text-content">${html}</div>
+
+            <div class="reading-stage" id="reading-stage-listen" style="display:none;">
+                <div class="reading-toolbar">
+                    <button type="button" class="ex-btn primary reading-play-btn">🔊 Lire le texte</button>
+                    <div class="reading-speed-control">
+                        <button type="button" class="reading-speed-btn" data-dir="-1" title="Ralentir">🐢</button>
+                        <span class="reading-speed-value">${this.readingRate.toFixed(2)}x</span>
+                        <button type="button" class="reading-speed-btn" data-dir="1" title="Accélérer">🐇</button>
+                    </div>
+                </div>
+            </div>
+
+            <div class="reading-stage" id="reading-stage-record" style="display:none;">
+                <button type="button" class="ex-btn secondary reading-record-btn">🎤 Enregistrer ma lecture</button>
+            </div>
+
+            <div class="reading-feedback" id="reading-feedback" style="display:none;"></div>
+        `;
+
+        // a) Lecture silencieuse : traduction au clic sur chaque mot (comme le traducteur principal)
+        this.attachReadingWordTranslation(container);
+
+        // Associer chaque span de mot à ses données ; seuls les mots réellement prononcés
+        // (hors traductions entre parenthèses) participent à la surbrillance et à l'alignement de prononciation
+        const spans = container.querySelectorAll('.reading-word');
+        this.readingWordsData = words
+            .map((w, idx) => ({ ...w, element: spans[idx] }))
+            .filter(w => w.spoken);
+
+        // Positions des mots dans le texte réellement envoyé au moteur TTS (parenthèses retirées) :
+        // permet de resynchroniser la surbrillance sur la position exacte (charIndex) plutôt que de
+        // compter les évènements un par un, ce qui dérive dès qu'un évènement manque ou est fusionné.
+        const spokenText = ex.text.replace(/\([^)]*\)/g, ' ');
+        const spokenOffsets = this.computeSpokenTextOffsets(spokenText);
+        this.readingWordsData.forEach((w, idx) => {
+            if (spokenOffsets[idx]) {
+                w.spokenStart = spokenOffsets[idx].start;
+                w.spokenEnd = spokenOffsets[idx].end;
+            }
+        });
+
+        this.isReadingAloud = false;
+        this.isReadingPaused = false;
+        this.isRecordingReading = false;
+        this.currentReadingRecognition = null;
+        // Réinitialisé à chaque nouveau rendu : sinon un enregistrement déjà fait lors d'un rendu
+        // précédent (même exercice régénéré, ou révisite via les points de navigation) empêche
+        // silencieusement la révélation de l'étape d'enregistrement sur ce nouveau rendu.
+        this.hasListenedToReading = false;
+
         btnCheck.style.display = 'none';
+        btnNext.style.display = 'none';
+
+        const listenStage = container.querySelector('#reading-stage-listen');
+        const recordStage = container.querySelector('#reading-stage-record');
+        const feedbackEl = container.querySelector('#reading-feedback');
+
+        // b) Après 20 secondes de lecture silencieuse, révéler l'accès à l'écoute
+        this.readingRevealTimeout = setTimeout(() => {
+            listenStage.style.display = 'block';
+        }, 20000);
+
+        const playBtn = container.querySelector('.reading-play-btn');
+        const speedValueEl = container.querySelector('.reading-speed-value');
+        this.currentReadingPlayBtn = playBtn;
+
+        playBtn.onclick = () => {
+            if (!this.isReadingAloud) {
+                this.startReadingTTS(ex.text);
+            } else if (this.isReadingPaused) {
+                this.resumeReadingTTS();
+            } else {
+                this.pauseReadingTTS();
+            }
+            this.refreshReadingPlayButton();
+        };
+
+        container.querySelectorAll('.reading-speed-btn').forEach(btn => {
+            btn.onclick = () => {
+                const dir = parseInt(btn.dataset.dir, 10);
+                this.readingRate = Math.max(0.5, Math.min(1.5, Math.round((this.readingRate + dir * 0.15) * 100) / 100));
+                speedValueEl.textContent = `${this.readingRate.toFixed(2)}x`;
+                // Une lecture en cours reprend immédiatement depuis le début à la nouvelle vitesse
+                if (this.isReadingAloud) {
+                    this.startReadingTTS(ex.text);
+                    this.refreshReadingPlayButton();
+                }
+            };
+        });
+
+        // c) Une fois une lecture terminée au moins une fois, révéler l'enregistrement
+        this.onReadingFinishedOnce = () => {
+            if (this.hasListenedToReading) return;
+            this.hasListenedToReading = true;
+            recordStage.style.display = 'block';
+        };
+
+        const recordBtn = container.querySelector('.reading-record-btn');
+        recordBtn.onclick = () => {
+            this.toggleReadingRecording(recordBtn, feedbackEl, () => {
+                // "Continuer" n'apparaît qu'une fois l'élève enregistré
+                btnNext.style.display = 'block';
+            });
+        };
     }
 
     renderFamily(ex, container, btnCheck, btnNext) {
         container.innerHTML = `
             <div class="family-exercise">
                 <div class="families-grid" id="families"></div>
+                <p class="ex-hint" id="family-hint">Retourne chaque carte (🔄) pour tester tes connaissances, puis clique sur « Vérifier ». Tu peux revoir le recto à tout moment.</p>
+                <div class="ex-result" id="family-result" style="display:none;"></div>
             </div>
         `;
 
         const familiesDiv = container.querySelector('#families');
+        const hintEl = container.querySelector('#family-hint');
+        const resultEl = container.querySelector('#family-result');
+        const totalCards = ex.items.length;
+        const flippedOnce = new Set(); // cartes retournées au moins une fois (pour débloquer Vérifier)
 
-        ex.items.forEach(item => {
-            const card = document.createElement('div');
-            card.className = 'family-card';
+        btnCheck.style.display = 'none';
+        btnNext.style.display = 'none';
 
+        ex.items.forEach((item, cardIdx) => {
             // Gérer "mainWord" ou "word" pour compatibilité
             const mainWord = item.mainWord || item.word || 'Mot';
 
+            const card = document.createElement('div');
+            card.className = 'family-card';
+            card.dataset.idx = cardIdx;
             card.innerHTML = `
-                <div class="main-word-node">${mainWord}</div>
-                <div class="related-words-container">
-                    ${item.related.map(word => `<span class="related-tag">${word}</span>`).join('')}
+                <div class="family-card-inner">
+                    <div class="family-card-front">
+                        <button type="button" class="family-flip-icon-btn family-flip-btn" title="Tester mes connaissances" aria-label="Tester mes connaissances">🔄</button>
+                        <div class="main-word-node">${mainWord}</div>
+                        <div class="related-words-container">
+                            ${item.related.map(word => `<span class="related-tag" data-word="${word}">${word}</span>`).join('')}
+                        </div>
+                    </div>
+                    <div class="family-card-back">
+                        <button type="button" class="family-flip-icon-btn family-flip-back-btn" title="Revoir le recto" aria-label="Revoir le recto">🔄</button>
+                        <div class="main-word-node">${mainWord}</div>
+                        <div class="family-inputs-container">
+                            ${item.related.map((word, i) => `<input type="text" class="family-input" placeholder="Mot lié ${i + 1}" autocomplete="off">`).join('')}
+                        </div>
+                    </div>
                 </div>
             `;
             familiesDiv.appendChild(card);
+
+            card.querySelector('.family-flip-btn').addEventListener('click', (e) => {
+                e.stopPropagation();
+                card.classList.add('flipped');
+                flippedOnce.add(cardIdx);
+                if (flippedOnce.size === totalCards) {
+                    hintEl.style.display = 'none';
+                    btnCheck.style.display = 'block';
+                }
+            });
+
+            // Toujours possible de revoir le recto (exercice formatif, pas de pénalité)
+            card.querySelector('.family-flip-back-btn').addEventListener('click', (e) => {
+                e.stopPropagation();
+                card.classList.remove('flipped');
+            });
         });
 
-        btnCheck.style.display = 'none';
-        btnNext.style.display = 'block';
+        // Bulle de traduction (langue maternelle) au survol de chaque étiquette de mot lié
+        const familyTranslationCache = new Map();
+        familiesDiv.querySelectorAll('.related-tag').forEach(tag => {
+            tag.addEventListener('mouseenter', async () => {
+                const word = tag.dataset.word;
+                if (!familyTranslationCache.has(word)) {
+                    try {
+                        familyTranslationCache.set(word, await this.translateText(word));
+                    } catch (e) {
+                        familyTranslationCache.set(word, null);
+                    }
+                }
+                const translation = familyTranslationCache.get(word);
+                // La souris peut être repartie pendant l'appel réseau
+                if (!translation || !tag.matches(':hover') || tag.querySelector('.related-tag-translation')) return;
+                const bubble = document.createElement('span');
+                bubble.className = 'related-tag-translation';
+                bubble.textContent = translation;
+                tag.appendChild(bubble);
+            });
+            tag.addEventListener('mouseleave', () => {
+                const bubble = tag.querySelector('.related-tag-translation');
+                if (bubble) bubble.remove();
+            });
+        });
+
+        // Vérification : compare les mots tapés au dos de chaque carte aux mots liés attendus
+        // (comparaison insensible aux accents/casse, ordre libre)
+        btnCheck.onclick = () => {
+            let totalWords = 0;
+            let correctWords = 0;
+
+            familiesDiv.querySelectorAll('.family-card').forEach((card) => {
+                const item = ex.items[parseInt(card.dataset.idx, 10)];
+                const expected = item.related.map(w => this.normalizeReadingWord(w));
+                card.querySelectorAll('.family-input').forEach(input => {
+                    totalWords++;
+                    input.classList.remove('correct', 'incorrect');
+                    const value = input.value ? this.normalizeReadingWord(input.value) : '';
+                    const matchIdx = value ? expected.indexOf(value) : -1;
+                    if (matchIdx !== -1) {
+                        correctWords++;
+                        expected.splice(matchIdx, 1); // évite de compter deux fois le même mot
+                        input.classList.add('correct');
+                    } else {
+                        input.classList.add('incorrect');
+                    }
+                });
+            });
+
+            // Formatif : trouver au moins 2 mots suffit pour continuer (ou tous s'il y en a moins de 2 au total)
+            const requiredWords = Math.min(2, totalWords);
+            const passed = correctWords >= requiredWords;
+            resultEl.style.display = 'block';
+
+            if (passed) {
+                btnNext.style.display = 'block';
+                resultEl.innerHTML = `<p class="ex-score ex-score-success">Bravo ! ${correctWords} / ${totalWords} mots retrouvés — pas grave pour le reste, tu peux continuer.</p>`;
+            } else {
+                resultEl.innerHTML = `<p class="ex-score ex-score-fail">${correctWords} / ${totalWords} mots retrouvés — trouve au moins ${requiredWords} mots pour continuer. Corrige tes réponses et vérifie à nouveau.</p>`;
+            }
+        };
     }
 
-    renderCloze(ex, container, btnCheck, btnNext) {
+    // Approximation simple de la première syllabe (indice), pas une syllabification linguistique exacte
+    getFirstSyllableHint(word) {
+        const match = word.match(/^[^aeiouyàâäéèêëïîôöùûüy]*[aeiouyàâäéèêëïîôöùûüy]+[^aeiouyàâäéèêëïîôöùûüy]*/i);
+        return match ? match[0] : word.slice(0, Math.min(2, word.length));
+    }
+
+    renderCloze(ex, container, btnCheck, btnNext, withHints = false) {
         container.innerHTML = `
             <div class="cloze-exercise">
                 <div class="cloze-items" id="cloze-list"></div>
             </div>
+            <div class="ex-result" id="cloze-result" style="display:none;"></div>
         `;
 
         const listDiv = container.querySelector('#cloze-list');
+        const resultEl = container.querySelector('#cloze-result');
 
         ex.items.forEach((item, idx) => {
             const div = document.createElement('div');
             div.className = 'cloze-item';
 
-            const html = item.text.replace('___', `<input type="text" class="cloze-input" data-idx="${idx}" autocomplete="off">`);
+            const hint = withHints ? ` placeholder="${this.getFirstSyllableHint(item.answer)}…"` : '';
+            const html = item.text.replace('___', `<input type="text" class="cloze-input" data-idx="${idx}" autocomplete="off"${hint}>`);
             div.innerHTML = `<span class="bullet">${idx + 1}</span> <span>${html}</span>`;
             listDiv.appendChild(div);
         });
 
         btnCheck.style.display = 'block';
+        btnNext.style.display = 'none';
         btnCheck.onclick = () => {
             let correctCount = 0;
             ex.items.forEach((item, idx) => {
@@ -1505,15 +2334,28 @@ class DaspalecteTranslator {
                 }
             });
 
-            if (correctCount === ex.items.length) {
+            const accuracy = ex.items.length > 0 ? correctCount / ex.items.length : 1;
+
+            if (accuracy >= 0.7) {
                 btnNext.style.display = 'block';
                 btnCheck.style.display = 'none';
+                resultEl.style.setProperty('display', 'none', 'important');
+                resultEl.innerHTML = '';
             } else {
                 setTimeout(() => {
                     container.querySelectorAll('.cloze-input.error').forEach(i => {
                         i.classList.remove('error');
                     });
                 }, 2000);
+
+                resultEl.style.display = 'block';
+                resultEl.innerHTML = `
+                    <p class="ex-score ex-score-fail">${Math.round(accuracy * 100)}% de bonnes réponses — il faut au moins 70% pour continuer.</p>
+                    <button type="button" class="ex-btn secondary ex-retry-btn">💡 Recommencer avec indice</button>
+                `;
+                resultEl.querySelector('.ex-retry-btn').onclick = () => {
+                    this.renderCloze(ex, container, btnCheck, btnNext, true);
+                };
             }
         };
     }
@@ -1882,7 +2724,10 @@ class DaspalecteTranslator {
             el.className = 'match-item';
             el.textContent = pair.fr;
             el.dataset.val = pair.fr;
-            el.addEventListener('click', (e) => {
+            el.tabIndex = 0;
+            el.setAttribute('role', 'button');
+            el.setAttribute('aria-label', pair.fr);
+            const handleSelect = (e) => {
                 e.stopPropagation();
                 if (el.classList.contains('ct-paired')) {
                     unpair(el);
@@ -1892,6 +2737,13 @@ class DaspalecteTranslator {
                 el.classList.add('selected');
                 selectedFrEl = el;
                 tryFormPair();
+            };
+            el.addEventListener('click', handleSelect);
+            el.addEventListener('keydown', (e) => {
+                if (e.key === 'Enter' || e.key === ' ') {
+                    e.preventDefault();
+                    handleSelect(e);
+                }
             });
             colFr.appendChild(el);
         });
@@ -1901,7 +2753,10 @@ class DaspalecteTranslator {
             el.className = 'match-item';
             el.textContent = pair.tr;
             el.dataset.val = pair.fr;
-            el.addEventListener('click', (e) => {
+            el.tabIndex = 0;
+            el.setAttribute('role', 'button');
+            el.setAttribute('aria-label', pair.tr);
+            const handleSelect = (e) => {
                 e.stopPropagation();
                 if (el.classList.contains('ct-paired')) {
                     unpair(el);
@@ -1911,6 +2766,13 @@ class DaspalecteTranslator {
                 el.classList.add('selected');
                 selectedTrEl = el;
                 tryFormPair();
+            };
+            el.addEventListener('click', handleSelect);
+            el.addEventListener('keydown', (e) => {
+                if (e.key === 'Enter' || e.key === ' ') {
+                    e.preventDefault();
+                    handleSelect(e);
+                }
             });
             colTr.appendChild(el);
         });

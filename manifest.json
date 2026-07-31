@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Daspalecte",
-  "version": "1.9",
+  "version": "1.10",
   "description": "Aide à la lecture et compréhension pour élèves DASPA.",
   "permissions": [
     "storage",
@@ -45,7 +45,7 @@
         "pdfviewer.html", "pdfviewer.js", "pdfviewer.css",
         "themes.css", "theme-manager.js",
         "lib/pdf.min.mjs", "lib/pdf.worker.min.mjs",
-        "icon48.png"
+        "icon48.png", "logo-pedagokit.png"
       ],
       "matches": ["<all_urls>"]
     }

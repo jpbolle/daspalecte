@@ -14,7 +14,7 @@
 <body>
     <div class="panel-container">
         <!-- Bouton X de fermeture -->
-        <button id="close-panel-btn" class="close-panel-btn" title="Fermer le panneau">×</button>
+        <button id="close-panel-btn" class="close-panel-btn" title="Fermer le panneau" aria-label="Fermer le panneau">×</button>
         
         <header>
             <h1 class="neon-text">Outils de lecture</h1>
@@ -24,7 +24,7 @@
             <div class="section-header">
                 <h2>Traducteur</h2>
                 <label class="switch">
-                    <input type="checkbox" id="translator-toggle">
+                    <input type="checkbox" id="translator-toggle" aria-label="Activer le traducteur">
                     <span class="slider round"></span>
                 </label>
             </div>
@@ -37,7 +37,7 @@
             <div class="section-header">
                 <h2>Mots</h2>
                 <div class="section-header-actions">
-                    <button id="delete-selected" class="header-icon-btn hidden" title="Supprimer la sélection">🗑️</button>
+                    <button id="delete-selected" class="header-icon-btn hidden" title="Supprimer la sélection" aria-label="Supprimer la sélection">🗑️</button>
                     <button id="select-all" class="text-link">Tout cocher</button>
                 </div>
             </div>
@@ -55,7 +55,7 @@
             <div class="section-header">
                 <h2>Compréhension</h2>
                 <label class="switch">
-                    <input type="checkbox" id="comprehension-toggle">
+                    <input type="checkbox" id="comprehension-toggle" aria-label="Activer l'aide à la compréhension">
                     <span class="slider round"></span>
                 </label>
             </div>
@@ -65,7 +65,7 @@
             <div class="section-header">
                 <h2>Test de lecture</h2>
                 <label class="switch">
-                    <input type="checkbox" id="reading-test-toggle">
+                    <input type="checkbox" id="reading-test-toggle" aria-label="Activer le test de lecture">
                     <span class="slider round"></span>
                 </label>
             </div>
@@ -75,8 +75,8 @@
         </section>
 
         <footer class="branding-footer">
-            <p>2026 - version 1.9</p>
-            <img src="https://drive.google.com/thumbnail?id=17m5J5zlV1SrLhJeX8JBzK2QZMWwFgXgf&sz=w500"
+            <p>2026 - version 1.10</p>
+            <img src="logo-pedagokit.png"
                 alt="Logo PedagokIT" class="branding-logo">
         </footer>
     </div>

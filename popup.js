@@ -12,7 +12,10 @@ function showThemeChooser() {
     themeChooser.style.display = 'flex';
     mainPopup.style.display = 'none';
     selectedTheme = null;
-    themeCards.forEach(c => c.classList.remove('selected'));
+    themeCards.forEach(c => {
+        c.classList.remove('selected');
+        c.setAttribute('aria-checked', 'false');
+    });
     themeConfirmBtn.disabled = true;
 }
 
@@ -21,13 +24,33 @@ function showMainPopup() {
     mainPopup.style.display = 'flex';
 }
 
-// Theme card selection
+// Theme card selection (souris, tactile, clic clavier via Entrée/Espace, et flèches entre les 2 cartes)
 themeCards.forEach(card => {
-    card.addEventListener('click', () => {
-        themeCards.forEach(c => c.classList.remove('selected'));
+    const selectCard = () => {
+        themeCards.forEach(c => {
+            c.classList.remove('selected');
+            c.setAttribute('aria-checked', 'false');
+        });
         card.classList.add('selected');
+        card.setAttribute('aria-checked', 'true');
         selectedTheme = card.getAttribute('data-theme-choice');
         themeConfirmBtn.disabled = false;
+    };
+
+    card.addEventListener('click', selectCard);
+
+    card.addEventListener('keydown', (e) => {
+        const cards = Array.from(themeCards);
+        if (e.key === 'Enter' || e.key === ' ') {
+            e.preventDefault();
+            selectCard();
+        } else if (e.key === 'ArrowRight' || e.key === 'ArrowDown') {
+            e.preventDefault();
+            cards[(cards.indexOf(card) + 1) % cards.length].focus();
+        } else if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') {
+            e.preventDefault();
+            cards[(cards.indexOf(card) - 1 + cards.length) % cards.length].focus();
+        }
     });
 });
 

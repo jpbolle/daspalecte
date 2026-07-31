@@ -5,8 +5,10 @@ pdfjsLib.GlobalWorkerOptions.workerSrc = chrome.runtime.getURL('lib/pdf.worker.m
 const state = {
     pdf: null,
     currentScale: 1.5,
-    renderedPages: new Set(),
-    rendering: false
+    renderedPages: new Set(), // texte extrait + emplacement posé (léger, pour toutes les pages)
+    visuallyRendered: new Set(), // canvas effectivement dessiné (seulement les pages visibles)
+    rendering: false,
+    pageObserver: null
 };
 
 // DOM elements
@@ -40,42 +42,22 @@ function hideLoading() {
     if (loader) loader.remove();
 }
 
-// Render a single page
-async function renderPage(pageNum) {
+// Pose l'emplacement de la page (dimensions correctes pour le scroll) et en extrait le texte.
+// Léger : pas de rasterisation de canvas — se fait pour TOUTES les pages dès le chargement,
+// pour que la compréhension / le test de lecture disposent du texte complet immédiatement.
+async function createPagePlaceholder(pageNum) {
     if (state.renderedPages.has(pageNum)) return;
 
     const page = await state.pdf.getPage(pageNum);
     const viewport = page.getViewport({ scale: state.currentScale });
 
-    // Create wrapper
     const wrapper = document.createElement('div');
-    wrapper.className = 'pdf-page-wrapper';
+    wrapper.className = 'pdf-page-wrapper pending';
     wrapper.dataset.pageNum = pageNum;
     wrapper.style.width = viewport.width + 'px';
     wrapper.style.height = viewport.height + 'px';
-
-    // Canvas for rendering
-    const canvas = document.createElement('canvas');
-    const ctx = canvas.getContext('2d');
-    canvas.width = viewport.width * window.devicePixelRatio;
-    canvas.height = viewport.height * window.devicePixelRatio;
-    canvas.style.width = viewport.width + 'px';
-    canvas.style.height = viewport.height + 'px';
-    ctx.scale(window.devicePixelRatio, window.devicePixelRatio);
-
-    wrapper.appendChild(canvas);
-
-    // Text layer
-    const textLayerDiv = document.createElement('div');
-    textLayerDiv.className = 'pdf-text-layer';
-    wrapper.appendChild(textLayerDiv);
-
     container.appendChild(wrapper);
 
-    // Render canvas
-    await page.render({ canvasContext: ctx, viewport }).promise;
-
-    // Render text layer
     const textContent = await page.getTextContent();
 
     // Check for scanned PDF (first page only)
@@ -86,7 +68,7 @@ async function renderPage(pageNum) {
         }
     }
 
-    // Place text spans (visual overlay for click-to-translate)
+    // Regroupe les lignes en paragraphes (pour boutons magiques / test de lecture)
     let lastY = null;
     let lineTexts = [];
     let paragraphLines = [];
@@ -96,33 +78,10 @@ async function renderPage(pageNum) {
         if (!item.str.trim()) return;
 
         const tx = pdfjsLib.Util.transform(viewport.transform, item.transform);
-
-        const span = document.createElement('span');
-        span.textContent = item.str;
-
-        // Position and size from transform
         const fontSize = Math.sqrt(tx[2] * tx[2] + tx[3] * tx[3]);
-        const left = tx[4];
-        const top = tx[5] - fontSize;
+        const currentY = Math.round(tx[5] - fontSize);
 
-        span.style.left = left + 'px';
-        span.style.top = top + 'px';
-        span.style.fontSize = fontSize + 'px';
-        span.style.fontFamily = item.fontName || 'sans-serif';
-
-        // Width matching
-        if (item.width > 0) {
-            const scaledWidth = item.width * state.currentScale;
-            span.style.width = scaledWidth + 'px';
-            span.style.letterSpacing = 'normal';
-        }
-
-        textLayerDiv.appendChild(span);
-
-        // Group lines into paragraphs for comprehension/test features
-        const currentY = Math.round(top);
         if (lastY !== null && Math.abs(currentY - lastY) > fontSize * 1.8) {
-            // Big gap = new paragraph
             if (lineTexts.length > 0) {
                 paragraphLines.push({ text: lineTexts.join(' '), y: paragraphStartY });
                 lineTexts = [];
@@ -143,17 +102,107 @@ async function renderPage(pageNum) {
         .filter(p => p.text.trim().length > 50)
         .map(p => ({ text: p.text.trim(), y: p.y }));
 
-    // Add structured paragraphs to the hidden text container
+    // Add structured paragraphs to the hidden text container (un seul appendChild groupé)
     const textContainer = document.getElementById('pdf-text-content');
+    const textFragment = document.createDocumentFragment();
     paragraphLines.forEach(item => {
         if (item.text.trim().length > 10) {
             const p = document.createElement('p');
             p.textContent = item.text.trim();
-            textContainer.appendChild(p);
+            textFragment.appendChild(p);
         }
     });
+    textContainer.appendChild(textFragment);
 
     state.renderedPages.add(pageNum);
+}
+
+// Rendu visuel réel d'une page (canvas + calque de texte cliquable) — coûteux,
+// déclenché uniquement quand la page approche de la zone visible (voir observeVisiblePages).
+async function renderPageVisual(pageNum) {
+    if (state.visuallyRendered.has(pageNum)) return;
+    state.visuallyRendered.add(pageNum);
+
+    const wrapper = container.querySelector(`.pdf-page-wrapper[data-page-num="${pageNum}"]`);
+    if (!wrapper) return;
+
+    const page = await state.pdf.getPage(pageNum);
+    const viewport = page.getViewport({ scale: state.currentScale });
+
+    // Canvas for rendering
+    const canvas = document.createElement('canvas');
+    const ctx = canvas.getContext('2d');
+    canvas.width = viewport.width * window.devicePixelRatio;
+    canvas.height = viewport.height * window.devicePixelRatio;
+    canvas.style.width = viewport.width + 'px';
+    canvas.style.height = viewport.height + 'px';
+    ctx.scale(window.devicePixelRatio, window.devicePixelRatio);
+    wrapper.appendChild(canvas);
+
+    // Text layer (overlay cliquable pour la traduction, positions recalculées à l'échelle actuelle)
+    const textLayerDiv = document.createElement('div');
+    textLayerDiv.className = 'pdf-text-layer';
+    wrapper.appendChild(textLayerDiv);
+
+    await page.render({ canvasContext: ctx, viewport }).promise;
+
+    const textContent = await page.getTextContent();
+    const spanFragment = document.createDocumentFragment();
+
+    textContent.items.forEach(item => {
+        if (!item.str.trim()) return;
+
+        const tx = pdfjsLib.Util.transform(viewport.transform, item.transform);
+
+        const span = document.createElement('span');
+        span.textContent = item.str;
+
+        const fontSize = Math.sqrt(tx[2] * tx[2] + tx[3] * tx[3]);
+        const left = tx[4];
+        const top = tx[5] - fontSize;
+
+        span.style.left = left + 'px';
+        span.style.top = top + 'px';
+        span.style.fontSize = fontSize + 'px';
+        span.style.fontFamily = item.fontName || 'sans-serif';
+
+        if (item.width > 0) {
+            span.style.width = (item.width * state.currentScale) + 'px';
+            span.style.letterSpacing = 'normal';
+        }
+
+        spanFragment.appendChild(span);
+    });
+
+    textLayerDiv.appendChild(spanFragment);
+    wrapper.classList.remove('pending');
+}
+
+// Observe les emplacements de page et ne déclenche le rendu visuel (coûteux) que
+// pour celles qui approchent de la zone visible — évite de garder des dizaines
+// de canvas pleine résolution en mémoire sur un long PDF.
+function observeVisiblePages() {
+    if (state.pageObserver) {
+        state.pageObserver.disconnect();
+    }
+
+    state.pageObserver = new IntersectionObserver((entries) => {
+        entries.forEach(entry => {
+            if (entry.isIntersecting) {
+                const pageNum = parseInt(entry.target.dataset.pageNum, 10);
+                renderPageVisual(pageNum);
+                state.pageObserver.unobserve(entry.target);
+            }
+        });
+    }, {
+        root: null,
+        rootMargin: '600px 0px', // pré-rend un peu avant que la page n'entre à l'écran
+        threshold: 0.01
+    });
+
+    container.querySelectorAll('.pdf-page-wrapper').forEach(wrapper => {
+        state.pageObserver.observe(wrapper);
+    });
 }
 
 // Render all pages
@@ -169,9 +218,13 @@ async function renderAllPages() {
         textContainer.prepend(title);
     }
 
+    // Emplacements + texte pour toutes les pages (léger, nécessaire pour compréhension/test de lecture)
     for (let i = 1; i <= numPages; i++) {
-        await renderPage(i);
+        await createPagePlaceholder(i);
     }
+
+    // Rendu visuel (canvas) uniquement pour les pages qui approchent de l'écran
+    observeVisiblePages();
 
     // Notify content.js that PDF text is ready (for magic buttons, test de lecture, etc.)
     document.dispatchEvent(new CustomEvent('daspalecte-pdf-ready'));
@@ -179,12 +232,23 @@ async function renderAllPages() {
 
 // Re-render all at new scale
 async function rerender() {
-    container.innerHTML = '';
-    const textContainer = document.getElementById('pdf-text-content');
-    textContainer.innerHTML = '';
-    state.renderedPages.clear();
-    zoomLevel.textContent = Math.round(state.currentScale / 1.5 * 100) + '%';
-    await renderAllPages();
+    if (state.rendering) return; // évite les rendus concurrents (double zoom rapide, resize pendant un rendu)
+    state.rendering = true;
+    try {
+        if (state.pageObserver) {
+            state.pageObserver.disconnect();
+            state.pageObserver = null;
+        }
+        container.innerHTML = '';
+        const textContainer = document.getElementById('pdf-text-content');
+        textContainer.innerHTML = '';
+        state.renderedPages.clear();
+        state.visuallyRendered.clear();
+        zoomLevel.textContent = Math.round(state.currentScale / 1.5 * 100) + '%';
+        await renderAllPages();
+    } finally {
+        state.rendering = false;
+    }
 }
 
 // Fit to width
@@ -192,7 +256,10 @@ function fitToWidth() {
     if (!state.pdf) return;
     state.pdf.getPage(1).then(page => {
         const unscaledViewport = page.getViewport({ scale: 1 });
-        const availableWidth = window.innerWidth - 560; // padding for left+right margins
+        // Lit la marge réelle (elle varie selon les breakpoints CSS) plutôt qu'une valeur figée
+        const containerStyle = window.getComputedStyle(container);
+        const horizontalPadding = parseFloat(containerStyle.paddingLeft) + parseFloat(containerStyle.paddingRight);
+        const availableWidth = window.innerWidth - horizontalPadding;
         state.currentScale = availableWidth / unscaledViewport.width;
         rerender();
     });
@@ -258,6 +325,13 @@ function setupControls() {
     zoomFit.addEventListener('click', fitToWidth);
 
     window.addEventListener('scroll', updateCurrentPage);
+
+    // Recalcule la mise en page à chaque redimensionnement (rotation, fenêtre réduite, etc.)
+    let resizeTimeout = null;
+    window.addEventListener('resize', () => {
+        clearTimeout(resizeTimeout);
+        resizeTimeout = setTimeout(fitToWidth, 300);
+    });
 }
 
 // Main

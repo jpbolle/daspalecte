@@ -42,14 +42,14 @@ window.addEventListener('message', (event) => {
         console.log('[SIDEPANEL] 🎯 Traducteur désactivé pour exercices');
         isUpdatingToggles = true;
         translatorToggle.checked = false;
-        chrome.storage.local.set({ translatorEnabled: false });
+        try { chrome.storage.local.set({ translatorEnabled: false }); } catch (e) { /* extension context invalidated */ }
         isUpdatingToggles = false;
     } else if (event.data.type === 'TRANSLATOR_RESTORED_AFTER_EXERCISES') {
         // Le traducteur a été réactivé après les exercices
         console.log('[SIDEPANEL] 🔄 Traducteur restauré après exercices');
         isUpdatingToggles = true;
         translatorToggle.checked = true;
-        chrome.storage.local.set({ translatorEnabled: true });
+        try { chrome.storage.local.set({ translatorEnabled: true }); } catch (e) { /* extension context invalidated */ }
         isUpdatingToggles = false;
     } else if (event.data.type === 'COMPREHENSION_TEST_CLOSED') {
         // Le test de lecture a été fermé — reset le toggle
@@ -186,7 +186,7 @@ translatorToggle.addEventListener('change', () => {
     isUpdatingToggles = true;
 
     // NE PLUS désactiver la compréhension - les deux outils peuvent coexister!
-    chrome.storage.local.set({ translatorEnabled: translatorToggle.checked });
+    try { chrome.storage.local.set({ translatorEnabled: translatorToggle.checked }); } catch (e) { /* extension context invalidated */ }
 
     // Envoyer l'état complet et cohérent
     const message = {
@@ -217,7 +217,7 @@ comprehensionToggle.addEventListener('change', () => {
     isUpdatingToggles = true;
 
     // NE PLUS désactiver le traducteur - les deux outils peuvent coexister!
-    chrome.storage.local.set({ comprehensionEnabled: comprehensionToggle.checked });
+    try { chrome.storage.local.set({ comprehensionEnabled: comprehensionToggle.checked }); } catch (e) { /* extension context invalidated */ }
 
     // Envoyer un message complet avec tous les états à jour
     const message = {
@@ -246,16 +246,18 @@ readingTestToggle.addEventListener('change', () => {
 
     if (readingTestToggle.checked) {
         // Récupérer l'email de l'élève via chrome.identity
-        chrome.identity.getProfileUserInfo({ accountStatus: 'ANY' }, (userInfo) => {
-            const studentEmail = (userInfo && userInfo.email) ? userInfo.email : 'unknown@student';
-            console.log('[SIDEPANEL] 📧 Email élève:', studentEmail);
+        try {
+            chrome.identity.getProfileUserInfo({ accountStatus: 'ANY' }, (userInfo) => {
+                const studentEmail = (userInfo && userInfo.email) ? userInfo.email : 'unknown@student';
+                console.log('[SIDEPANEL] 📧 Email élève:', studentEmail);
 
-            sendToContentScript({
-                type: 'GENERATE_COMPREHENSION_TEST',
-                nativeLanguage: nativeLanguage,
-                studentEmail: studentEmail
+                sendToContentScript({
+                    type: 'GENERATE_COMPREHENSION_TEST',
+                    nativeLanguage: nativeLanguage,
+                    studentEmail: studentEmail
+                });
             });
-        });
+        } catch (e) { /* extension context invalidated */ }
     } else {
         // Si on désactive manuellement le toggle, fermer le test
         sendToContentScript({
@@ -265,34 +267,37 @@ readingTestToggle.addEventListener('change', () => {
 });
 
 // Initialize state - Charger la langue, les outils et la liste de mots
-chrome.storage.local.get(['nativeLanguage', 'translatorEnabled', 'wordList'], (data) => {
-    // Restaurer le traducteur depuis le storage (sync inter-onglets)
-    translatorToggle.checked = data.translatorEnabled || false;
-    // La compréhension reste toujours désactivée au démarrage (activation manuelle par onglet)
-    comprehensionToggle.checked = false;
+try {
+    chrome.storage.local.get(['nativeLanguage', 'translatorEnabled', 'wordList'], (data) => {
+        // Restaurer le traducteur depuis le storage (sync inter-onglets)
+        translatorToggle.checked = data.translatorEnabled || false;
+        // La compréhension reste toujours désactivée au démarrage (activation manuelle par onglet)
+        comprehensionToggle.checked = false;
 
-    // Charger la langue maternelle sauvegardée
-    if (data.nativeLanguage) {
-        nativeLanguage = data.nativeLanguage;
-    }
+        // Charger la langue maternelle sauvegardée
+        if (data.nativeLanguage) {
+            nativeLanguage = data.nativeLanguage;
+        }
 
-    // Charger la liste de mots accumulés
-    if (data.wordList && data.wordList.length > 0) {
-        data.wordList.forEach(item => addWordToList(item.word, item.translation, true));
-    }
+        // Charger la liste de mots accumulés
+        if (data.wordList && data.wordList.length > 0) {
+            data.wordList.forEach(item => addWordToList(item.word, item.translation, true));
+        }
 
-    console.log('[SIDEPANEL] État initial chargé:', {
-        nativeLanguage,
-        translator: translatorToggle.checked,
-        words: (data.wordList || []).length
+        console.log('[SIDEPANEL] État initial chargé:', {
+            nativeLanguage,
+            translator: translatorToggle.checked,
+            words: (data.wordList || []).length
+        });
+
+        // Signaler au content script que le sidepanel est prêt
+        // (APRÈS avoir chargé les mots pour que le dédup fonctionne sur les messages en attente)
+        window.parent.postMessage({ type: 'SIDEPANEL_READY' }, '*');
     });
-
-    // Signaler au content script que le sidepanel est prêt
-    // (APRÈS avoir chargé les mots pour que le dédup fonctionne sur les messages en attente)
-    window.parent.postMessage({ type: 'SIDEPANEL_READY' }, '*');
-});
+} catch (e) { /* extension context invalidated */ }
 
 // Écouter les changements depuis le storage (langue + outils depuis d'autres onglets)
+try {
 chrome.storage.onChanged.addListener((changes, namespace) => {
     if (namespace !== 'local') return;
 
@@ -342,6 +347,7 @@ chrome.storage.onChanged.addListener((changes, namespace) => {
         updateActionsBarVisibility();
     }
 });
+} catch (e) { /* extension context invalidated */ }
 
 // Button triggers (basés sur la sélection)
 document.getElementById('gen-exercises').addEventListener('click', () => {

@@ -16,6 +16,8 @@
   --t-text-muted: #cccccc;
   --t-text-dim: #999999;
   --t-text-on-primary: #000000;
+  --t-text-on-accent: #1a0a1f;
+  --t-accent-ink: var(--t-accent);
   --t-border: rgba(255, 255, 255, 0.1);
   --t-border-strong: rgba(255, 255, 255, 0.2);
   --t-danger: #ff4d4d;
@@ -98,6 +100,8 @@
   --t-translation-bg: #000000;
   --t-translation-text: #00f3ff;
   --t-translation-shadow: 0 2px 5px rgba(0, 0, 0, 0.5);
+  --t-translation-hover-text: #ffffff;
+  --t-translation-hover-shadow: var(--t-shadow-glow);
 
   /* Scrollbar */
   --t-scrollbar-track: rgba(255, 255, 255, 0.02);
@@ -129,9 +133,11 @@
   --t-bg-element: #f0ebe3;
   --t-text: #3d3832;
   --t-text-secondary: #5a534b;
-  --t-text-muted: #8a7f72;
-  --t-text-dim: #a89e92;
+  --t-text-muted: #6b6259;
+  --t-text-dim: #766c61;
   --t-text-on-primary: #ffffff;
+  --t-text-on-accent: #2e1c0a;
+  --t-accent-ink: #7a4d18;
   --t-border: #d5cec4;
   --t-border-strong: #b5ad9f;
   --t-danger: #b44040;
@@ -209,11 +215,14 @@
   --t-magic-btn-border: #2d6a5a;
   --t-magic-btn-shadow: 0 2px 10px rgba(45, 106, 90, 0.4);
   --t-magic-btn-hover-bg: #e8f0ee;
+  --t-magic-btn-hover-icon-glow: drop-shadow(0 0 1px #2d6a5a) drop-shadow(0 0 2px rgba(45, 106, 90, 0.8));
 
   /* Translation bubble */
   --t-translation-bg: #2d6a5a;
   --t-translation-text: #ffffff;
   --t-translation-shadow: 0 2px 8px rgba(45, 106, 90, 0.4);
+  --t-translation-hover-text: #ffffff;
+  --t-translation-hover-shadow: 0 0 8px rgba(212, 148, 76, 0.7);
 
   /* Scrollbar */
   --t-scrollbar-track: rgba(0, 0, 0, 0.02);
