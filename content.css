@@ -688,6 +688,55 @@ html.daspalecte-page-pushed {
     color: var(--t-text-secondary) !important;
 }
 
+.reading-sentence {
+    display: flex !important;
+    align-items: flex-start !important;
+    gap: 12px !important;
+    margin-bottom: 8px !important;
+}
+
+.reading-sentence-play {
+    all: unset !important;
+    flex-shrink: 0 !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    width: 32px !important;
+    height: 32px !important;
+    margin-top: 6px !important;
+    border-radius: 50% !important;
+    border: 1px solid var(--t-border) !important;
+    background: var(--t-glass-bg) !important;
+    cursor: pointer !important;
+    font-size: 14px !important;
+    transition: all 0.2s ease !important;
+}
+
+.reading-sentence-play:hover {
+    background: var(--t-glass-bg-hover) !important;
+    border-color: var(--t-primary) !important;
+}
+
+.reading-sentence-play:focus-visible {
+    outline: 2px solid var(--t-primary) !important;
+    outline-offset: 2px !important;
+}
+
+.reading-sentence-play.reading-sentence-played {
+    border-color: var(--t-success) !important;
+    background: color-mix(in srgb, var(--t-success) 15%, var(--t-bg-element)) !important;
+}
+
+.reading-sentence-content {
+    flex: 1 !important;
+}
+
+.reading-toolbar-hint {
+    font-family: var(--t-font-body) !important;
+    font-size: 14px !important;
+    color: var(--t-text-muted) !important;
+}
+
 .reading-toolbar {
     display: flex !important;
     align-items: center !important;
@@ -860,6 +909,23 @@ html.daspalecte-page-pushed {
     border-color: var(--t-danger) !important;
     background: rgba(255, 77, 77, 0.1) !important;
     animation: daspa-shake 0.4s ease-in-out !important;
+}
+
+.match-item-audio {
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    gap: 10px !important;
+}
+
+.match-item-audio-icon {
+    font-size: 22px !important;
+}
+
+.match-item-audio-label {
+    font-family: var(--t-font-body) !important;
+    font-size: 15px !important;
+    color: var(--t-text-muted) !important;
 }
 
 @keyframes daspa-shake {
@@ -1251,6 +1317,105 @@ html.daspalecte-page-pushed {
     color: var(--t-danger) !important;
     background: rgba(255, 77, 77, 0.05) !important;
     animation: daspa-shake 0.4s ease-in-out !important;
+}
+
+/* Styles Exercice 6 - Phrase avec le vocabulaire */
+.sentence-exercise {
+    display: flex !important;
+    flex-direction: column !important;
+    gap: 20px !important;
+}
+
+.sentence-word-chip {
+    cursor: default !important;
+}
+
+.sentence-word-chip:hover {
+    transform: none !important;
+    background: var(--t-bg-element) !important;
+    color: var(--t-primary) !important;
+    box-shadow: none !important;
+}
+
+.sentence-word-chip.sentence-word-used {
+    border-color: var(--t-success) !important;
+    color: var(--t-success) !important;
+    background: color-mix(in srgb, var(--t-success) 12%, var(--t-bg-element)) !important;
+}
+
+.sentence-textarea {
+    background: var(--t-glass-bg) !important;
+    border: 1px solid var(--t-primary-a50) !important;
+    border-radius: var(--t-radius) !important;
+    color: var(--t-text) !important;
+    padding: 15px !important;
+    font-size: 17px !important;
+    font-family: var(--t-font-body) !important;
+    resize: vertical !important;
+    min-height: 90px !important;
+    outline: none !important;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1) !important;
+    width: 100% !important;
+    box-sizing: border-box !important;
+}
+
+.sentence-textarea:focus {
+    background: var(--t-primary-a08) !important;
+    border-color: var(--t-primary) !important;
+    box-shadow: 0 5px 15px var(--t-primary-a10) !important;
+}
+
+.sentence-counter {
+    color: var(--t-text-muted) !important;
+    font-size: 14px !important;
+    text-align: center !important;
+    margin: 0 !important;
+}
+
+.sentence-word-feedback-list {
+    list-style: none !important;
+    display: flex !important;
+    flex-direction: column !important;
+    gap: 8px !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    width: 100% !important;
+    max-width: 480px !important;
+    text-align: left !important;
+}
+
+.sentence-word-feedback-list li {
+    font-family: var(--t-font-body) !important;
+    font-size: 14px !important;
+    line-height: 1.4 !important;
+    padding: 8px 14px !important;
+    border-radius: var(--t-radius-sm) !important;
+    border: 1px solid transparent !important;
+}
+
+.sentence-word-feedback-ok {
+    border-color: var(--t-success) !important;
+    background: color-mix(in srgb, var(--t-success) 10%, var(--t-bg-element)) !important;
+    color: var(--t-text) !important;
+}
+
+.sentence-word-feedback-bad {
+    border-color: var(--t-danger) !important;
+    background: color-mix(in srgb, var(--t-danger) 10%, var(--t-bg-element)) !important;
+    color: var(--t-text) !important;
+}
+
+.sentence-corrected-example {
+    font-family: var(--t-font-body) !important;
+    font-size: 16px !important;
+    font-weight: 600 !important;
+    padding: 12px 18px !important;
+    border-radius: var(--t-radius) !important;
+    border: 1px solid var(--t-success) !important;
+    background: color-mix(in srgb, var(--t-success) 12%, var(--t-bg-element)) !important;
+    color: var(--t-success) !important;
+    margin: 0 !important;
+    text-align: center !important;
 }
 
 /* ============================================ */

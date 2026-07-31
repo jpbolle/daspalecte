@@ -584,13 +584,11 @@ class DaspalecteTranslator {
         } else if (message.type === 'SPEAK_FRENCH') {
             this.speakFrench(message.text);
         } else if (message.type === 'TTS_WORD_BOUNDARY') {
-            // Un vrai évènement de limite de mot est arrivé : on n'a plus besoin de l'estimation par minuterie
-            this.readingWordBoundaryReceived = true;
-            this.clearReadingFallbackTimer();
+            // La minuterie estimée pilote déjà la surbrillance (voir startReadingTTS) : ces évènements
+            // ne servent que de rattrapage si elle a pris du retard, jamais à la faire reculer
+            // (voir la garde dans advanceReadingHighlightToCharIndex).
             if (typeof message.charIndex === 'number') {
                 this.advanceReadingHighlightToCharIndex(message.charIndex);
-            } else {
-                this.advanceReadingHighlight();
             }
         } else if (message.type === 'TTS_READING_ENDED') {
             this.finishReadingAloud();
@@ -622,6 +620,14 @@ class DaspalecteTranslator {
         const div = document.createElement('div');
         div.textContent = text;
         return div.innerHTML;
+    }
+
+    // Découpe le texte en phrases (une ligne par phrase, chacune avec sa propre synthèse vocale) :
+    // un split simple sur la ponctuation forte suivie d'espace/fin de texte suffit pour les textes
+    // courts et simples générés pour cet exercice, pas besoin d'une vraie segmentation linguistique.
+    splitIntoSentences(text) {
+        const matches = text.match(/[^.!?…]+[.!?…]+(\s+|$)|[^.!?…]+$/g) || [text];
+        return matches.map(s => s.trim()).filter(Boolean);
     }
 
     // Découpe le texte en mots (spans individuels), en conservant espaces/ponctuation intacts et
@@ -671,7 +677,6 @@ class DaspalecteTranslator {
         this.isReadingAloud = true;
         this.isReadingPaused = false;
         this.readingSpokenIndex = -1;
-        this.readingWordBoundaryReceived = false;
         this.clearReadingFallbackTimer();
         this.clearReadingHighlight();
 
@@ -679,14 +684,13 @@ class DaspalecteTranslator {
         const spokenText = text.replace(/\([^)]*\)/g, ' ');
         chrome.runtime.sendMessage({ type: 'SPEAK_TEXT_TRACKED', text: spokenText, rate: this.readingRate });
 
-        // Filet de sécurité : certaines voix ne remontent jamais d'évènement de limite de mot.
-        // Si rien n'arrive rapidement, on estime la progression avec une minuterie plutôt que de
-        // n'avoir aucune surbrillance du tout.
-        this.readingFallbackGraceTimeout = setTimeout(() => {
-            if (!this.readingWordBoundaryReceived && this.isReadingAloud) {
-                this.startReadingFallbackTimer();
-            }
-        }, 700);
+        // La surbrillance est pilotée par une minuterie estimée (mots/minute), démarrée immédiatement,
+        // plutôt que par les évènements de limite de mot du moteur TTS : sur certaines voix (ex. voix
+        // systeme via chrome.tts), ces évènements arrivent jusqu'à ~1s après que le mot ait été
+        // réellement prononcé, ce qui rendait la surbrillance visiblement en retard sur la voix.
+        // Les évènements réels restent utilisés (voir TTS_WORD_BOUNDARY) pour rattraper la minuterie
+        // si elle prend du retard, mais ne la font jamais reculer.
+        this.startReadingFallbackTimer();
     }
 
     stopReadingTTS() {
@@ -710,11 +714,11 @@ class DaspalecteTranslator {
     refreshReadingPlayButton() {
         if (!this.currentReadingPlayBtn) return;
         if (!this.isReadingAloud) {
-            this.currentReadingPlayBtn.innerHTML = '🔊 Lire le texte';
+            this.currentReadingPlayBtn.innerHTML = '🔊';
         } else if (this.isReadingPaused) {
-            this.currentReadingPlayBtn.innerHTML = '▶ Reprendre';
+            this.currentReadingPlayBtn.innerHTML = '▶';
         } else {
-            this.currentReadingPlayBtn.innerHTML = '⏸ Pause';
+            this.currentReadingPlayBtn.innerHTML = '⏸';
         }
     }
 
@@ -742,8 +746,10 @@ class DaspalecteTranslator {
                 this.readingFallbackTimer = null;
                 return;
             }
+            const currentWord = this.readingWordsData[this.readingSpokenIndex];
             const nextWord = this.readingWordsData[this.readingSpokenIndex + 1];
-            this.readingFallbackTimer = setTimeout(scheduleNext, this.estimateWordDurationMs(nextWord.text));
+            const pauseMs = currentWord && currentWord.pauseAfterMs ? currentWord.pauseAfterMs / this.readingRate : 0;
+            this.readingFallbackTimer = setTimeout(scheduleNext, this.estimateWordDurationMs(nextWord.text) + pauseMs);
         };
 
         scheduleNext();
@@ -753,10 +759,6 @@ class DaspalecteTranslator {
         if (this.readingFallbackTimer) {
             clearTimeout(this.readingFallbackTimer);
             this.readingFallbackTimer = null;
-        }
-        if (this.readingFallbackGraceTimeout) {
-            clearTimeout(this.readingFallbackGraceTimeout);
-            this.readingFallbackGraceTimeout = null;
         }
         if (this.readingEndFallbackTimer) {
             clearTimeout(this.readingEndFallbackTimer);
@@ -798,9 +800,9 @@ class DaspalecteTranslator {
         this.readingWordsData.forEach(w => w.element.classList.remove('reading-word-active'));
     }
 
-    // Resynchronise directement sur la position de caractère rapportée par le moteur TTS, plutôt que
-    // d'avancer d'un cran par évènement : ainsi un mot fusionné/scindé par le moteur vocal ne fait pas
-    // dériver le surlignage au fil de la lecture (il se recale automatiquement à chaque évènement).
+    // Rattrapage : ne fait avancer la surbrillance (pilotée par la minuterie estimée) que si la
+    // position rapportée par le moteur TTS est déjà plus avancée que la minuterie ; ne la fait
+    // jamais reculer, car ces évènements peuvent arriver après coup (voir startReadingTTS).
     advanceReadingHighlightToCharIndex(charIndex) {
         if (!this.readingWordsData || !this.readingWordsData.length) return;
         let idx = this.readingWordsData.findIndex(w => w.spokenStart !== undefined && w.spokenStart > charIndex);
@@ -939,13 +941,15 @@ class DaspalecteTranslator {
     }
 
     showReadingPronunciationFeedback(transcript, feedbackEl) {
-        if (!this.readingWordsData) return;
+        // Référence = TOUT le texte (toutes les phrases), indépendamment de la dernière phrase
+        // écoutée individuellement — voir this.readingFullTextWordsData dans renderReading().
+        if (!this.readingFullTextWordsData) return;
 
         const recognizedWords = transcript.split(/\s+/).filter(Boolean);
-        const referenceWords = this.readingWordsData.map(w => w.text);
+        const referenceWords = this.readingFullTextWordsData.map(w => w.text);
         const matched = this.alignReadingWords(referenceWords, recognizedWords);
 
-        this.readingWordsData.forEach((w, idx) => {
+        this.readingFullTextWordsData.forEach((w, idx) => {
             w.element.classList.remove('reading-correct', 'reading-incorrect');
             w.element.classList.add(matched[idx] ? 'reading-correct' : 'reading-incorrect');
         });
@@ -1482,12 +1486,64 @@ class DaspalecteTranslator {
             }
 
             const data = await response.json();
-            this.displayExercises(data.exercises, words, targetLang);
+            // Deux exercices sont construits côté client, sans génération Claude supplémentaire :
+            // l'appariement à l'écoute (mêmes paires que l'exercice "matching", inséré après la
+            // lecture) et la phrase avec le vocabulaire (ajoutée en dernier).
+            const orderedExercises = [...data.exercises];
+            const matchingEx = orderedExercises.find(e => e.type === 'matching');
+            const listeningEx = this.buildListeningMatchingExercise(matchingEx);
+            if (listeningEx) {
+                const readingIdx = orderedExercises.findIndex(e => e.type === 'reading');
+                const insertAt = readingIdx === -1 ? orderedExercises.length : readingIdx + 1;
+                orderedExercises.splice(insertAt, 0, listeningEx);
+            }
+            orderedExercises.push(this.buildSentenceExercise(words));
+            this.renumberExerciseTitles(orderedExercises);
+
+            this.displayExercises(orderedExercises, words, targetLang);
         } catch (error) {
             console.error('Erreur exercices:', error);
             alert('Erreur lors de la préparation des exercices.');
             this.closeExerciseOverlay();
         }
+    }
+
+    // Corrige le préfixe "Exercice N : " de chaque titre selon la position réelle dans le tableau
+    // final — les titres viennent en partie de Claude, en partie construits côté client, et
+    // l'insertion d'exercices supplémentaires décale forcément la numérotation des suivants.
+    renumberExerciseTitles(exercises) {
+        exercises.forEach((ex, idx) => {
+            if (typeof ex.title === 'string') {
+                ex.title = ex.title.replace(/^Exercice\s*\d*\s*:/, `Exercice ${idx + 1} :`);
+            }
+        });
+        return exercises;
+    }
+
+    // Construit l'exercice d'appariement à l'écoute : mêmes paires mot/traduction que l'exercice
+    // "Associez les mots", mais l'élève doit écouter chaque mot français (synthèse vocale) avant de
+    // l'associer, plutôt que le lire. Pas de génération IA nécessaire, les paires existent déjà.
+    buildListeningMatchingExercise(matchingExercise) {
+        if (!matchingExercise || !Array.isArray(matchingExercise.pairs) || !matchingExercise.pairs.length) return null;
+        return {
+            type: 'listening_matching',
+            title: 'Exercice : Écoute et associe',
+            description: 'Écoute chaque mot français (🔊) et relie-le à sa traduction.',
+            pairs: matchingExercise.pairs
+        };
+    }
+
+    // Construit l'exercice de phrase avec le vocabulaire : pas de génération IA nécessaire,
+    // la liste de mots imposés est déjà connue côté client. Seule la vérification grammaticale
+    // de la phrase produite par l'élève passe par Claude (action verify_sentence).
+    buildSentenceExercise(words) {
+        const required = Math.max(1, Math.ceil(words.length / 2));
+        return {
+            type: 'sentence',
+            title: 'Exercice : Phrase avec le vocabulaire',
+            description: `Écris une phrase en français qui utilise au moins ${required} mot${required > 1 ? 's' : ''} parmi les ${words.length} appris (soit la moitié).`,
+            words
+        };
     }
 
     showOverlayLoader() {
@@ -1575,20 +1631,46 @@ class DaspalecteTranslator {
             const btnPrev = content.querySelector('#btn-prev');
             const dotsEl = content.querySelector('#exercise-dots');
 
-            // Points de navigation : cliquables seulement pour l'exercice courant ou déjà réussi
+            // Capturé maintenant (pas lu depuis la variable `currentStep`, qui peut avoir changé d'ici
+            // là) : chaque exercice appelle ceci dès qu'il se sait réussi, plutôt que de compter sur
+            // la navigation pour le déduire après coup — sinon un exercice réussi sans jamais être
+            // quitté explicitement via "Continuer" pouvait laisser son point de navigation injoignable.
+            const stepBeingRendered = currentStep;
+            const markCompleted = () => completedSteps.add(stepBeingRendered);
+
+            // Navigue vers un autre exercice en marquant le pas courant comme réussi s'il l'était déjà
+            // (bouton "Continuer" visible), même sans clic explicite dessus. Sinon un exercice réussi
+            // puis quitté via un point de navigation (au lieu de "Continuer") redevenait injoignable :
+            // son point restait désactivé pour toujours, y compris pour le tout dernier exercice.
+            const goToStep = (idx) => {
+                if (btnNext.style.display !== 'none') {
+                    completedSteps.add(currentStep);
+                }
+                if (idx >= exercises.length) {
+                    this.showFinishScreen(content);
+                    return;
+                }
+                currentStep = idx;
+                renderStep();
+            };
+
+            // Points de navigation : cliquables pour l'exercice courant, déjà réussi, ou le tout
+            // premier exercice non encore réussi (le "prochain" naturel de la progression) — sinon
+            // revenir en arrière pour consulter un exercice réussi rendait le suivant injoignable
+            // sans repasser par "Continuer" sur chaque exercice entre-temps.
+            const maxCompletedIdx = completedSteps.size ? Math.max(...completedSteps) : -1;
             exercises.forEach((_, idx) => {
                 const dot = document.createElement('button');
                 dot.type = 'button';
                 dot.className = 'exercise-dot';
                 if (idx === currentStep) dot.classList.add('active');
                 if (completedSteps.has(idx)) dot.classList.add('completed');
-                const clickable = idx === currentStep || completedSteps.has(idx);
+                const clickable = idx === currentStep || completedSteps.has(idx) || idx === maxCompletedIdx + 1;
                 dot.disabled = !clickable;
                 dot.setAttribute('aria-label', `Exercice ${idx + 1}${completedSteps.has(idx) ? ' (terminé)' : ''}`);
                 dot.addEventListener('click', () => {
                     if (!clickable) return;
-                    currentStep = idx;
-                    renderStep();
+                    goToStep(idx);
                 });
                 dotsEl.appendChild(dot);
             });
@@ -1623,7 +1705,7 @@ class DaspalecteTranslator {
                 }
             };
 
-            this.renderExerciseType(ex, body, btnCheck, btnNext, regenerateCurrentExercise);
+            this.renderExerciseType(ex, body, btnCheck, btnNext, regenerateCurrentExercise, markCompleted);
 
             // Un exercice déjà réussi ne redevient pas obligatoire en y revenant :
             // "Continuer" reste disponible même si l'élève ne le refait pas.
@@ -1634,69 +1716,101 @@ class DaspalecteTranslator {
             // Navigation : Précédent (toujours possible)
             btnPrev.onclick = () => {
                 if (currentStep > 0) {
-                    currentStep--;
-                    renderStep();
+                    goToStep(currentStep - 1);
                 }
             };
 
             // Bouton "Continuer" — n'apparaît que lorsque l'exercice courant est réussi
             btnNext.onclick = () => {
-                completedSteps.add(currentStep);
-                currentStep++;
-                if (currentStep < exercises.length) {
-                    renderStep();
-                } else {
-                    this.showFinishScreen(content);
-                }
+                goToStep(currentStep + 1);
             };
         };
 
         renderStep();
     }
 
-    renderExerciseType(ex, container, btnCheck, btnNext, regenerateCurrentExercise) {
+    renderExerciseType(ex, container, btnCheck, btnNext, regenerateCurrentExercise, markCompleted) {
         switch (ex.type) {
-            case 'matching': this.renderMatching(ex, container, btnCheck, btnNext); break;
-            case 'tags': this.renderTags(ex, container, btnCheck, btnNext, regenerateCurrentExercise); break;
-            case 'reading': this.renderReading(ex, container, btnCheck, btnNext); break;
-            case 'family': this.renderFamily(ex, container, btnCheck, btnNext); break;
-            case 'cloze': this.renderCloze(ex, container, btnCheck, btnNext); break;
+            case 'matching': this.renderMatching(ex, container, btnCheck, btnNext, markCompleted); break;
+            case 'listening_matching': this.renderMatching(ex, container, btnCheck, btnNext, markCompleted); break;
+            case 'tags': this.renderTags(ex, container, btnCheck, btnNext, regenerateCurrentExercise, markCompleted); break;
+            case 'reading': this.renderReading(ex, container, btnCheck, btnNext, markCompleted); break;
+            case 'family': this.renderFamily(ex, container, btnCheck, btnNext, markCompleted); break;
+            case 'cloze': this.renderCloze(ex, container, btnCheck, btnNext, undefined, markCompleted); break;
+            case 'sentence': this.renderSentence(ex, container, btnCheck, btnNext, markCompleted); break;
         }
     }
 
-    renderMatching(ex, container, btnCheck, btnNext) {
+    renderMatching(ex, container, btnCheck, btnNext, markCompleted = () => {}) {
+        // Variante "écoute et associe" : la colonne française n'affiche pas le texte, seulement un
+        // bouton d'écoute — l'élève doit reconnaître le mot à l'oreille avant de l'associer.
+        const audioOnly = ex.type === 'listening_matching';
         let selectedFr = null;
         let selectedTr = null;
+        let selectedFrEl = null;
+        let selectedTrEl = null;
         let matchesFound = 0;
         const totalPairs = ex.pairs.length;
 
         container.innerHTML = `
-            <div class="matching-container">
+            <div class="matching-container" style="position: relative !important;">
                 <div class="matching-col" id="col-fr"></div>
+                <svg id="matching-svg" style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; z-index: 1;"></svg>
                 <div class="matching-col" id="col-tr"></div>
             </div>
         `;
 
         const colFr = container.querySelector('#col-fr');
         const colTr = container.querySelector('#col-tr');
+        const matchingContainer = container.querySelector('.matching-container');
+        const svg = container.querySelector('#matching-svg');
+
+        // Ligne colorée reliant chaque paire trouvée (comme dans le test de lecture), en plus du
+        // surlignage des cases : redessinée à chaque nouvelle paire trouvée.
+        const matchedLines = [];
+        const drawLines = () => {
+            svg.innerHTML = '';
+            const containerRect = matchingContainer.getBoundingClientRect();
+            matchedLines.forEach(({ frEl, trEl }) => {
+                const frRect = frEl.getBoundingClientRect();
+                const trRect = trEl.getBoundingClientRect();
+                const line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+                line.setAttribute('x1', frRect.right - containerRect.left);
+                line.setAttribute('y1', frRect.top + frRect.height / 2 - containerRect.top);
+                line.setAttribute('x2', trRect.left - containerRect.left);
+                line.setAttribute('y2', trRect.top + trRect.height / 2 - containerRect.top);
+                line.setAttribute('stroke-width', '2');
+                line.setAttribute('opacity', '0.8');
+                line.style.setProperty('stroke', 'var(--t-success)');
+                svg.appendChild(line);
+            });
+        };
 
         // Mélanger les tableaux pour le défi
         const frItems = [...ex.pairs].sort(() => Math.random() - 0.5);
         const trItems = [...ex.pairs].sort(() => Math.random() - 0.5);
 
-        frItems.forEach(pair => {
+        frItems.forEach((pair, idx) => {
             const el = document.createElement('div');
             el.className = 'match-item';
-            el.textContent = pair.fr;
             el.dataset.val = pair.fr;
             el.tabIndex = 0;
             el.setAttribute('role', 'button');
-            el.setAttribute('aria-label', pair.fr);
+            if (audioOnly) {
+                el.classList.add('match-item-audio');
+                el.innerHTML = `<span class="match-item-audio-icon">🔊</span><span class="match-item-audio-label">Mot ${idx + 1}</span>`;
+                el.setAttribute('aria-label', `Écouter le mot ${idx + 1} et l'associer à sa traduction`);
+            } else {
+                el.textContent = pair.fr;
+                el.setAttribute('aria-label', pair.fr);
+            }
             const handleSelect = () => {
                 if (el.classList.contains('matched')) return;
+                if (audioOnly) this.speakFrench(pair.fr);
                 colFr.querySelectorAll('.match-item').forEach(i => i.classList.remove('selected'));
                 el.classList.add('selected');
                 selectedFr = pair.fr;
+                selectedFrEl = el;
                 checkMatch();
             };
             el.onclick = handleSelect;
@@ -1722,6 +1836,7 @@ class DaspalecteTranslator {
                 colTr.querySelectorAll('.match-item').forEach(i => i.classList.remove('selected'));
                 el.classList.add('selected');
                 selectedTr = pair.fr;
+                selectedTrEl = el;
                 checkMatch();
             };
             el.onclick = handleSelect;
@@ -1737,14 +1852,17 @@ class DaspalecteTranslator {
         const checkMatch = () => {
             if (selectedFr && selectedTr) {
                 if (selectedFr === selectedTr) {
-                    // Succès
+                    // Succès : on relie les deux mots par une ligne, comme dans le test de lecture
                     container.querySelectorAll(`.match-item[data-val="${selectedFr}"]`).forEach(el => {
                         el.classList.remove('selected');
                         el.classList.add('matched');
                     });
+                    matchedLines.push({ frEl: selectedFrEl, trEl: selectedTrEl });
+                    drawLines();
                     matchesFound++;
                     if (matchesFound === totalPairs) {
                         btnNext.style.display = 'block';
+                        markCompleted();
                     }
                 } else {
                     // Erreur temporaire
@@ -1759,6 +1877,8 @@ class DaspalecteTranslator {
                 }
                 selectedFr = null;
                 selectedTr = null;
+                selectedFrEl = null;
+                selectedTrEl = null;
             }
         };
 
@@ -1766,7 +1886,7 @@ class DaspalecteTranslator {
         btnNext.style.display = 'none';
     }
 
-    renderTags(ex, container, btnCheck, btnNext, regenerateExercise) {
+    renderTags(ex, container, btnCheck, btnNext, regenerateExercise, markCompleted = () => {}) {
         let answers = {}; // { itemIndex: selectedWord }
         let selectedTag = null; // étiquette armée pour un placement au clic/clavier
         const totalItems = ex.items.length;
@@ -1985,6 +2105,7 @@ class DaspalecteTranslator {
 
             if (accuracy >= 0.7) {
                 btnNext.style.display = 'block';
+                markCompleted();
                 btnCheck.style.display = 'none';
                 // .ex-result a un `display: flex !important` en CSS qui écraserait un simple
                 // style.display = 'none' : la boîte resterait visible avec son dernier contenu
@@ -2049,20 +2170,32 @@ class DaspalecteTranslator {
         });
     }
 
-    renderReading(ex, container, btnCheck, btnNext) {
-        const { html, words } = this.buildReadingWordSpans(ex.text);
+    renderReading(ex, container, btnCheck, btnNext, markCompleted = () => {}) {
+        // Une ligne par phrase, chacune avec son propre bouton d'écoute : plus le texte est long,
+        // plus l'estimation de surbrillance (basée sur la durée par mot) dérivait par rapport à la
+        // voix au fil du texte. En limitant chaque lecture à une seule phrase courte, la dérive
+        // repart de zéro à chaque clic et reste imperceptible.
+        const sentences = this.splitIntoSentences(ex.text);
+
+        const sentenceHtml = sentences.map((sentenceText, idx) => {
+            const { html } = this.buildReadingWordSpans(sentenceText);
+            return `
+                <div class="reading-sentence" data-idx="${idx}">
+                    <button type="button" class="reading-sentence-play" data-idx="${idx}" aria-label="Écouter cette phrase" style="visibility:hidden;">🔊</button>
+                    <span class="reading-sentence-content">${html}</span>
+                </div>
+            `;
+        }).join('');
 
         container.innerHTML = `
-            <div class="reading-text" id="reading-text-content">${html}</div>
+            <div class="reading-text" id="reading-text-content">${sentenceHtml}</div>
 
-            <div class="reading-stage" id="reading-stage-listen" style="display:none;">
-                <div class="reading-toolbar">
-                    <button type="button" class="ex-btn primary reading-play-btn">🔊 Lire le texte</button>
-                    <div class="reading-speed-control">
-                        <button type="button" class="reading-speed-btn" data-dir="-1" title="Ralentir">🐢</button>
-                        <span class="reading-speed-value">${this.readingRate.toFixed(2)}x</span>
-                        <button type="button" class="reading-speed-btn" data-dir="1" title="Accélérer">🐇</button>
-                    </div>
+            <div class="reading-toolbar" id="reading-toolbar" style="display:none;">
+                <span class="reading-toolbar-hint">🔊 Clique sur une phrase pour l'écouter</span>
+                <div class="reading-speed-control">
+                    <button type="button" class="reading-speed-btn" data-dir="-1" title="Ralentir">🐢</button>
+                    <span class="reading-speed-value">${this.readingRate.toFixed(2)}x</span>
+                    <button type="button" class="reading-speed-btn" data-dir="1" title="Accélérer">🐇</button>
                 </div>
             </div>
 
@@ -2076,29 +2209,60 @@ class DaspalecteTranslator {
         // a) Lecture silencieuse : traduction au clic sur chaque mot (comme le traducteur principal)
         this.attachReadingWordTranslation(container);
 
-        // Associer chaque span de mot à ses données ; seuls les mots réellement prononcés
-        // (hors traductions entre parenthèses) participent à la surbrillance et à l'alignement de prononciation
-        const spans = container.querySelectorAll('.reading-word');
-        this.readingWordsData = words
-            .map((w, idx) => ({ ...w, element: spans[idx] }))
-            .filter(w => w.spoken);
+        // Construit, pour chaque phrase, ses propres données de surbrillance/timing (indépendantes
+        // des autres phrases), et cumule en parallèle la référence sur TOUT le texte — nécessaire
+        // pour l'alignement de l'enregistrement final, qui porte sur le texte entier.
+        const sentenceData = [];
+        const fullTextWordsData = [];
+        container.querySelectorAll('.reading-sentence').forEach((sentenceEl, idx) => {
+            const sentenceText = sentences[idx];
+            const { words } = this.buildReadingWordSpans(sentenceText);
+            const spans = sentenceEl.querySelectorAll('.reading-word');
+            const wordsWithEl = words
+                .map((w, i) => ({ ...w, element: spans[i] }))
+                .filter(w => w.spoken);
 
-        // Positions des mots dans le texte réellement envoyé au moteur TTS (parenthèses retirées) :
-        // permet de resynchroniser la surbrillance sur la position exacte (charIndex) plutôt que de
-        // compter les évènements un par un, ce qui dérive dès qu'un évènement manque ou est fusionné.
-        const spokenText = ex.text.replace(/\([^)]*\)/g, ' ');
-        const spokenOffsets = this.computeSpokenTextOffsets(spokenText);
-        this.readingWordsData.forEach((w, idx) => {
-            if (spokenOffsets[idx]) {
-                w.spokenStart = spokenOffsets[idx].start;
-                w.spokenEnd = spokenOffsets[idx].end;
-            }
+            // Positions dans le texte réellement envoyé au moteur TTS pour CETTE phrase (parenthèses
+            // retirées) : permet de resynchroniser sur la position exacte plutôt que de compter les
+            // évènements un par un.
+            const spokenText = sentenceText.replace(/\([^)]*\)/g, ' ');
+            const spokenOffsets = this.computeSpokenTextOffsets(spokenText);
+            wordsWithEl.forEach((w, i) => {
+                if (spokenOffsets[i]) {
+                    w.spokenStart = spokenOffsets[i].start;
+                    w.spokenEnd = spokenOffsets[i].end;
+                }
+            });
+
+            // Pause estimée après un signe de ponctuation forte, pour compenser le temps d'arrêt
+            // qu'une vraie voix marque et que le calcul par mot seul ne capture pas.
+            wordsWithEl.forEach((w, i) => {
+                if (w.spokenEnd === undefined) { w.pauseAfterMs = 0; return; }
+                const nextStart = wordsWithEl[i + 1] ? wordsWithEl[i + 1].spokenStart : spokenText.length;
+                const between = spokenText.slice(w.spokenEnd, nextStart);
+                if (/[.!?…]/.test(between)) w.pauseAfterMs = 450;
+                else if (/[,;:]/.test(between)) w.pauseAfterMs = 200;
+                else w.pauseAfterMs = 0;
+            });
+
+            sentenceData.push({
+                text: sentenceText,
+                wordsData: wordsWithEl,
+                playBtn: sentenceEl.querySelector('.reading-sentence-play')
+            });
+            fullTextWordsData.push(...wordsWithEl);
         });
+
+        // Référence utilisée uniquement par l'alignement de l'enregistrement final (texte entier) —
+        // distincte de this.readingWordsData, qui ne porte que sur la phrase en cours d'écoute.
+        this.readingFullTextWordsData = fullTextWordsData;
+        this.readingWordsData = null;
 
         this.isReadingAloud = false;
         this.isReadingPaused = false;
         this.isRecordingReading = false;
         this.currentReadingRecognition = null;
+        this.currentReadingPlayBtn = null;
         // Réinitialisé à chaque nouveau rendu : sinon un enregistrement déjà fait lors d'un rendu
         // précédent (même exercice régénéré, ou révisite via les points de navigation) empêche
         // silencieusement la révélation de l'étape d'enregistrement sur ce nouveau rendu.
@@ -2107,60 +2271,84 @@ class DaspalecteTranslator {
         btnCheck.style.display = 'none';
         btnNext.style.display = 'none';
 
-        const listenStage = container.querySelector('#reading-stage-listen');
+        const toolbarEl = container.querySelector('#reading-toolbar');
         const recordStage = container.querySelector('#reading-stage-record');
         const feedbackEl = container.querySelector('#reading-feedback');
 
-        // b) Après 20 secondes de lecture silencieuse, révéler l'accès à l'écoute
+        // b) Après 20 secondes de lecture silencieuse, révéler l'accès à l'écoute phrase par phrase
         this.readingRevealTimeout = setTimeout(() => {
-            listenStage.style.display = 'block';
+            toolbarEl.style.display = 'flex';
+            sentenceData.forEach(s => { s.playBtn.style.visibility = 'visible'; });
         }, 20000);
 
-        const playBtn = container.querySelector('.reading-play-btn');
-        const speedValueEl = container.querySelector('.reading-speed-value');
-        this.currentReadingPlayBtn = playBtn;
+        const playedSentences = new Set();
+        // c) Une fois TOUTES les phrases écoutées au moins une fois, révéler l'enregistrement
+        const checkAllSentencesPlayed = () => {
+            if (this.hasListenedToReading) return;
+            if (playedSentences.size < sentenceData.length) return;
+            this.hasListenedToReading = true;
+            recordStage.style.display = 'block';
+        };
 
-        playBtn.onclick = () => {
-            if (!this.isReadingAloud) {
-                this.startReadingTTS(ex.text);
-            } else if (this.isReadingPaused) {
-                this.resumeReadingTTS();
-            } else {
-                this.pauseReadingTTS();
+        // Démarre (ou redémarre depuis le début) la lecture d'une phrase donnée, en arrêtant
+        // proprement celle en cours s'il y en a une.
+        const startSentencePlayback = (idx) => {
+            const s = sentenceData[idx];
+            if (!s) return;
+            if (this.isReadingAloud) {
+                this.stopReadingTTS();
             }
+            this.readingWordsData = s.wordsData;
+            this.currentReadingPlayBtn = s.playBtn;
+            this.onReadingFinishedOnce = () => {
+                playedSentences.add(idx);
+                s.playBtn.classList.add('reading-sentence-played');
+                checkAllSentencesPlayed();
+            };
+            this.startReadingTTS(s.text);
             this.refreshReadingPlayButton();
         };
+
+        sentenceData.forEach((s, idx) => {
+            s.playBtn.onclick = () => {
+                // Reclique sur la phrase déjà en cours : pause/reprise plutôt que redémarrage
+                if (this.isReadingAloud && this.currentReadingPlayBtn === s.playBtn) {
+                    if (this.isReadingPaused) {
+                        this.resumeReadingTTS();
+                    } else {
+                        this.pauseReadingTTS();
+                    }
+                    this.refreshReadingPlayButton();
+                    return;
+                }
+                startSentencePlayback(idx);
+            };
+        });
 
         container.querySelectorAll('.reading-speed-btn').forEach(btn => {
             btn.onclick = () => {
                 const dir = parseInt(btn.dataset.dir, 10);
                 this.readingRate = Math.max(0.5, Math.min(1.5, Math.round((this.readingRate + dir * 0.15) * 100) / 100));
-                speedValueEl.textContent = `${this.readingRate.toFixed(2)}x`;
-                // Une lecture en cours reprend immédiatement depuis le début à la nouvelle vitesse
-                if (this.isReadingAloud) {
-                    this.startReadingTTS(ex.text);
-                    this.refreshReadingPlayButton();
+                container.querySelector('.reading-speed-value').textContent = `${this.readingRate.toFixed(2)}x`;
+                // Une phrase en cours de lecture reprend immédiatement depuis son début à la nouvelle vitesse
+                if (this.isReadingAloud && this.currentReadingPlayBtn) {
+                    const idx = sentenceData.findIndex(s => s.playBtn === this.currentReadingPlayBtn);
+                    if (idx !== -1) startSentencePlayback(idx);
                 }
             };
         });
-
-        // c) Une fois une lecture terminée au moins une fois, révéler l'enregistrement
-        this.onReadingFinishedOnce = () => {
-            if (this.hasListenedToReading) return;
-            this.hasListenedToReading = true;
-            recordStage.style.display = 'block';
-        };
 
         const recordBtn = container.querySelector('.reading-record-btn');
         recordBtn.onclick = () => {
             this.toggleReadingRecording(recordBtn, feedbackEl, () => {
                 // "Continuer" n'apparaît qu'une fois l'élève enregistré
                 btnNext.style.display = 'block';
+                markCompleted();
             });
         };
     }
 
-    renderFamily(ex, container, btnCheck, btnNext) {
+    renderFamily(ex, container, btnCheck, btnNext, markCompleted = () => {}) {
         container.innerHTML = `
             <div class="family-exercise">
                 <div class="families-grid" id="families"></div>
@@ -2279,6 +2467,7 @@ class DaspalecteTranslator {
 
             if (passed) {
                 btnNext.style.display = 'block';
+                markCompleted();
                 resultEl.innerHTML = `<p class="ex-score ex-score-success">Bravo ! ${correctWords} / ${totalWords} mots retrouvés — pas grave pour le reste, tu peux continuer.</p>`;
             } else {
                 resultEl.innerHTML = `<p class="ex-score ex-score-fail">${correctWords} / ${totalWords} mots retrouvés — trouve au moins ${requiredWords} mots pour continuer. Corrige tes réponses et vérifie à nouveau.</p>`;
@@ -2292,7 +2481,9 @@ class DaspalecteTranslator {
         return match ? match[0] : word.slice(0, Math.min(2, word.length));
     }
 
-    renderCloze(ex, container, btnCheck, btnNext, withHints = false) {
+    // hintIndices : Set des index d'items pour lesquels afficher l'indice syllabique (uniquement
+    // les réponses fausses lors de la tentative précédente, pas les bonnes déjà trouvées).
+    renderCloze(ex, container, btnCheck, btnNext, hintIndices = new Set(), markCompleted = () => {}) {
         container.innerHTML = `
             <div class="cloze-exercise">
                 <div class="cloze-items" id="cloze-list"></div>
@@ -2307,7 +2498,7 @@ class DaspalecteTranslator {
             const div = document.createElement('div');
             div.className = 'cloze-item';
 
-            const hint = withHints ? ` placeholder="${this.getFirstSyllableHint(item.answer)}…"` : '';
+            const hint = hintIndices.has(idx) ? ` placeholder="${this.getFirstSyllableHint(item.answer)}…"` : '';
             const html = item.text.replace('___', `<input type="text" class="cloze-input" data-idx="${idx}" autocomplete="off"${hint}>`);
             div.innerHTML = `<span class="bullet">${idx + 1}</span> <span>${html}</span>`;
             listDiv.appendChild(div);
@@ -2317,6 +2508,7 @@ class DaspalecteTranslator {
         btnNext.style.display = 'none';
         btnCheck.onclick = () => {
             let correctCount = 0;
+            const wrongIndices = new Set();
             ex.items.forEach((item, idx) => {
                 const input = container.querySelector(`.cloze-input[data-idx="${idx}"]`);
 
@@ -2331,6 +2523,7 @@ class DaspalecteTranslator {
                     correctCount++;
                 } else {
                     input.classList.add('error');
+                    wrongIndices.add(idx);
                 }
             });
 
@@ -2338,6 +2531,7 @@ class DaspalecteTranslator {
 
             if (accuracy >= 0.7) {
                 btnNext.style.display = 'block';
+                markCompleted();
                 btnCheck.style.display = 'none';
                 resultEl.style.setProperty('display', 'none', 'important');
                 resultEl.innerHTML = '';
@@ -2354,10 +2548,169 @@ class DaspalecteTranslator {
                     <button type="button" class="ex-btn secondary ex-retry-btn">💡 Recommencer avec indice</button>
                 `;
                 resultEl.querySelector('.ex-retry-btn').onclick = () => {
-                    this.renderCloze(ex, container, btnCheck, btnNext, true);
+                    this.renderCloze(ex, container, btnCheck, btnNext, wrongIndices, markCompleted);
                 };
             }
         };
+    }
+
+    // ========================================
+    // EXERCICE 6 — PHRASE AVEC LE VOCABULAIRE
+    // ========================================
+
+    // Extrait les "mots" d'une phrase (même découpage que la lecture) pour une comparaison
+    // insensible à la casse et aux accents avec la liste de vocabulaire imposée.
+    normalizeSentenceWord(str) {
+        return str.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '');
+    }
+
+    // Réduit un mot déjà normalisé à une forme insensible au genre/nombre (retire un -s/-x final de
+    // pluriel puis un -e final de féminin), pour reconnaître "ignorant" == "ignorante" == "ignorants".
+    // Approximation simple (ne gère pas le doublement de consonne type chat/chatte), volontairement
+    // pas une vraie lemmatisation.
+    stripGenderNumber(word) {
+        let w = word;
+        if (w.length > 3 && /[sx]$/.test(w)) w = w.slice(0, -1);
+        if (w.length > 3 && /e$/.test(w)) w = w.slice(0, -1);
+        return w;
+    }
+
+    wordMatchKey(str) {
+        return this.stripGenderNumber(this.normalizeSentenceWord(str));
+    }
+
+    extractSentenceWords(text) {
+        const regex = /[\p{L}\p{M}'’-]+/gu;
+        const found = [];
+        let match;
+        while ((match = regex.exec(text)) !== null) {
+            found.push(this.wordMatchKey(match[0]));
+        }
+        return found;
+    }
+
+    renderSentence(ex, container, btnCheck, btnNext, markCompleted = () => {}) {
+        const required = Math.max(1, Math.ceil(ex.words.length / 2));
+        container.innerHTML = `
+            <div class="sentence-exercise">
+                <div class="tags-pool" id="sentence-words-pool">
+                    ${ex.words.map(w => `<span class="tag-item sentence-word-chip" data-word="${this.escapeHtmlForReading(w)}">${this.escapeHtmlForReading(w)}</span>`).join('')}
+                </div>
+                <textarea class="sentence-textarea" id="sentence-input" rows="3" placeholder="Écris ta phrase ici…" autocomplete="off"></textarea>
+                <p class="sentence-counter" id="sentence-counter"></p>
+            </div>
+            <div class="ex-result" id="sentence-result" style="display:none;"></div>
+        `;
+
+        const textarea = container.querySelector('#sentence-input');
+        const counterEl = container.querySelector('#sentence-counter');
+        const resultEl = container.querySelector('#sentence-result');
+        const chips = Array.from(container.querySelectorAll('.sentence-word-chip'));
+
+        // Recalcule les mots utilisés à chaque frappe et met à jour le compteur + les étiquettes.
+        const updateUsedWords = () => {
+            const sentenceWords = new Set(this.extractSentenceWords(textarea.value));
+            const used = ex.words.filter(w => sentenceWords.has(this.wordMatchKey(w)));
+            const usedSet = new Set(used);
+            chips.forEach(chip => {
+                chip.classList.toggle('sentence-word-used', usedSet.has(chip.dataset.word));
+            });
+            counterEl.textContent = `${used.length} / ${ex.words.length} mots utilisés (il en faut au moins ${required})`;
+            return used;
+        };
+
+        textarea.addEventListener('input', updateUsedWords);
+        updateUsedWords();
+
+        btnCheck.style.display = 'block';
+        btnCheck.disabled = false;
+        btnCheck.textContent = 'Vérifier';
+        btnNext.style.display = 'none';
+
+        btnCheck.onclick = async () => {
+            const sentence = textarea.value.trim();
+            if (!sentence) {
+                resultEl.style.display = 'block';
+                resultEl.innerHTML = '<p class="ex-score ex-score-fail">Écris une phrase avant de vérifier.</p>';
+                return;
+            }
+
+            const used = updateUsedWords();
+            if (used.length < required) {
+                resultEl.style.display = 'block';
+                resultEl.innerHTML = `<p class="ex-score ex-score-fail">Tu utilises ${used.length} mot${used.length > 1 ? 's' : ''} sur ${ex.words.length} — il en faut au moins ${required}. Continue !</p>`;
+                return;
+            }
+
+            // Seuil de mots atteint : la correction grammaticale passe par Claude (backend)
+            btnCheck.disabled = true;
+            btnCheck.textContent = 'Vérification...';
+            resultEl.style.display = 'block';
+            resultEl.innerHTML = '<p class="ex-hint">Claude relit ta phrase…</p>';
+
+            try {
+                const verdict = await this.verifySentenceWithAI(sentence, used);
+                const wordsFeedback = Array.isArray(verdict.wordsFeedback) ? verdict.wordsFeedback : [];
+                const allWordsCorrect = wordsFeedback.every(w => w.correct);
+                const overallValid = !!verdict.sentenceValid && allWordsCorrect;
+
+                let html = '';
+
+                // a) Emploi de chaque mot, avec explication
+                if (wordsFeedback.length) {
+                    html += '<ul class="sentence-word-feedback-list">';
+                    wordsFeedback.forEach(w => {
+                        const ok = !!w.correct;
+                        html += `<li class="${ok ? 'sentence-word-feedback-ok' : 'sentence-word-feedback-bad'}">
+                            <strong>${this.escapeHtmlForReading(w.word || '')}</strong> ${ok ? '✅' : '❌'}
+                            ${w.explanation ? `— ${this.escapeHtmlForReading(w.explanation)}` : ''}
+                        </li>`;
+                    });
+                    html += '</ul>';
+                }
+
+                // b) Grammaire de la phrase entière, avec exemple corrigé en couleur si besoin
+                html += `<p class="ex-score ${verdict.sentenceValid ? 'ex-score-success' : 'ex-score-fail'}">${this.escapeHtmlForReading(verdict.sentenceFeedback || (verdict.sentenceValid ? 'Bravo, ta phrase est correcte !' : 'Ta phrase contient une erreur.'))}</p>`;
+                if (!verdict.sentenceValid && verdict.correctedSentence) {
+                    html += `<p class="sentence-corrected-example">✏️ ${this.escapeHtmlForReading(verdict.correctedSentence)}</p>`;
+                }
+
+                resultEl.innerHTML = html;
+
+                if (overallValid) {
+                    btnNext.style.display = 'block';
+                    markCompleted();
+                    btnCheck.style.display = 'none';
+                } else {
+                    btnCheck.disabled = false;
+                    btnCheck.textContent = 'Vérifier';
+                }
+            } catch (error) {
+                console.error('[CONTENT] Erreur vérification phrase:', error);
+                resultEl.innerHTML = '<p class="ex-score ex-score-fail">Impossible de vérifier ta phrase pour le moment, réessaie.</p>';
+                btnCheck.disabled = false;
+                btnCheck.textContent = 'Vérifier';
+            }
+        };
+    }
+
+    async verifySentenceWithAI(sentence, words) {
+        const response = await fetch('https://daspalecte-1086562672385.europe-west1.run.app', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                action: 'verify_sentence',
+                sentence,
+                words
+            })
+        });
+
+        if (!response.ok) {
+            const errorData = await response.json().catch(() => ({}));
+            throw new Error(errorData.message || 'Erreur lors de la vérification de la phrase');
+        }
+
+        return response.json();
     }
 
     showFinishScreen(content) {

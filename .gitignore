@@ -7,6 +7,9 @@ daspalecte-*.zip
 # Dossier backend (à gérer séparément avec secrets)
 cloud-function/
 
+# Add-on Google Apps Script (Docs/Sheets/Slides) — géré séparément, pas dans ce repo
+gas-addon/
+
 # Système
 .DS_Store
 *.log
