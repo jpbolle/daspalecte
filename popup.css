@@ -490,3 +490,117 @@ header {
   transform: none;
 }
 
+/* ============================================================
+   COMPTE ET ECRAN DE CONNEXION
+   ============================================================
+   L'acces a l'extension passe par une connexion Google. Une fois
+   connecte, le compte se replie derriere l'icone du coin superieur
+   droit : l'eleve n'a pas besoin de le voir a chaque ouverture. */
+
+.login-screen {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: 6px 0 18px;
+}
+
+.login-text {
+  margin: 0;
+  font-family: var(--t-font-body);
+  font-size: 0.82rem;
+  line-height: 1.5;
+  color: var(--t-text-secondary);
+  text-align: center;
+  text-wrap: pretty;
+}
+
+.login-text.is-error {
+  color: var(--t-danger);
+}
+
+/* header est deja position: relative — l'icone s'y ancre sans toucher
+   au flux, donc sans decaler le titre. */
+.account-avatar-btn {
+  position: absolute;
+  top: -4px;
+  right: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  padding: 0;
+  color: var(--t-primary);
+  background: var(--t-glass-bg);
+  border: 1.5px solid var(--t-primary-a30);
+  border-radius: 50%;
+  cursor: pointer;
+  opacity: 0.8;
+  transition: background 0.2s ease, border-color 0.2s ease, opacity 0.2s ease;
+}
+
+.account-avatar-btn:hover,
+.account-avatar-btn[aria-expanded="true"] {
+  background: var(--t-primary-a15);
+  border-color: var(--t-primary);
+  opacity: 1;
+}
+
+.account-avatar-btn svg {
+  flex-shrink: 0;
+  pointer-events: none;
+}
+
+/* Panneau deroulant ancre sous l'icone. `body` est en overflow: hidden,
+   d'ou le calage a droite et la largeur bornee : rien ne doit deborder
+   des 320 px de la popup, sinon le contenu serait rogne. */
+.account-line {
+  position: absolute;
+  top: 32px;
+  right: 0;
+  z-index: 5;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  max-width: 260px;
+  padding: 8px 10px;
+  text-align: left;
+  background: var(--t-bg-card);
+  border: 1px solid var(--t-border);
+  border-radius: var(--t-radius);
+  box-shadow: var(--t-shadow-popup);
+}
+
+.account-status {
+  min-width: 0;
+  overflow: hidden;
+  font-size: 0.72rem;
+  line-height: 1.35;
+  color: var(--t-text-secondary);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.account-btn {
+  flex-shrink: 0;
+  padding: 4px 10px;
+  font-family: var(--t-font-body);
+  font-size: 0.72rem;
+  font-weight: 500;
+  color: var(--t-primary);
+  background: var(--t-bg-card);
+  border: 1px solid var(--t-primary);
+  border-radius: var(--t-radius-sm);
+  cursor: pointer;
+  transition: background 0.15s ease, color 0.15s ease;
+}
+
+.account-btn:hover:not(:disabled) {
+  color: var(--t-text-on-primary);
+  background: var(--t-primary);
+}
+
+.account-btn:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}

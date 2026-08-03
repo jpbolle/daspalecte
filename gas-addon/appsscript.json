@@ -1,0 +1,36 @@
+{
+  "timeZone": "Europe/Brussels",
+  "exceptionLogging": "STACKDRIVER",
+  "runtimeVersion": "V8",
+  "addOns": {
+    "common": {
+      "name": "Daspalecte",
+      "logoUrl": "https://www.gstatic.com/images/icons/material/system/2x/translate_black_48dp.png",
+      "layoutProperties": {
+        "primaryColor": "#2d6a5a"
+      },
+      "homepageTrigger": {
+        "runFunction": "onHomepage",
+        "enabled": true
+      }
+    },
+    "docs": {},
+    "sheets": {},
+    "slides": {}
+  },
+  "urlFetchWhitelist": [
+    "https://daspalecte-1086562672385.europe-west1.run.app/",
+    "https://translate.googleapis.com/"
+  ],
+  "oauthScopes": [
+    "https://www.googleapis.com/auth/documents.currentonly",
+    "https://www.googleapis.com/auth/presentations.currentonly",
+    "https://www.googleapis.com/auth/spreadsheets.currentonly",
+    "https://www.googleapis.com/auth/script.container.ui",
+    "https://www.googleapis.com/auth/script.external_request"
+  ],
+  "webapp": {
+    "access": "DOMAIN",
+    "executeAs": "USER_ACCESSING"
+  }
+}

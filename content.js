@@ -1442,6 +1442,12 @@ class DaspalecteTranslator {
             }
 
             const data = await response.json();
+
+            this.track('comprehension', {
+                textLength: (text || '').length,
+                nativeLanguage: nativeLang
+            });
+
             // Retourner l'objet complet avec summary et reformulation
             return data;
         } catch (error) {
@@ -1594,6 +1600,9 @@ class DaspalecteTranslator {
 
         let currentStep = 0;
         const completedSteps = new Set(); // exercices déjà réussis au moins une fois
+        // Hors de renderStep : un exercice peut se redessiner (Défi avec indice,
+        // Étiquettes régénérées) et le compte d'essais doit survivre au redessin.
+        const attemptsByStep = {};
         const content = overlay.querySelector('.overlay-content');
         content.classList.remove('loader-active');
 
@@ -1636,7 +1645,28 @@ class DaspalecteTranslator {
             // la navigation pour le déduire après coup — sinon un exercice réussi sans jamais être
             // quitté explicitement via "Continuer" pouvait laisser son point de navigation injoignable.
             const stepBeingRendered = currentStep;
-            const markCompleted = () => completedSteps.add(stepBeingRendered);
+            // Nombre d'essais : on compte les clics sur "Vérifier" plutôt que d'ajouter
+            // un compteur dans chacun des sept exercices. Ceux qui n'ont pas de bouton
+            // "Vérifier" (Associations, Lecture) restent donc à un essai, ce qui est
+            // exact : leur correction est immédiate, il n'y a rien à retenter.
+            if (btnCheck) {
+                btnCheck.addEventListener('click', () => {
+                    attemptsByStep[stepBeingRendered] = (attemptsByStep[stepBeingRendered] || 0) + 1;
+                }, true);
+            }
+            const markCompleted = (result) => {
+                const first = !completedSteps.has(stepBeingRendered);
+                completedSteps.add(stepBeingRendered);
+                // Un exercice déjà réussi peut être re-vérifié : on n'enregistre
+                // que la première réussite, sinon le prof verrait des doublons.
+                if (first) {
+                    this.trackExerciseResult(
+                        exercises[stepBeingRendered],
+                        result,
+                        attemptsByStep[stepBeingRendered] || 1
+                    );
+                }
+            };
 
             // Navigue vers un autre exercice en marquant le pas courant comme réussi s'il l'était déjà
             // (bouton "Continuer" visible), même sans clic explicite dessus. Sinon un exercice réussi
@@ -1862,7 +1892,7 @@ class DaspalecteTranslator {
                     matchesFound++;
                     if (matchesFound === totalPairs) {
                         btnNext.style.display = 'block';
-                        markCompleted();
+                        markCompleted({ score: totalPairs, total: totalPairs });
                     }
                 } else {
                     // Erreur temporaire
@@ -2105,7 +2135,7 @@ class DaspalecteTranslator {
 
             if (accuracy >= 0.7) {
                 btnNext.style.display = 'block';
-                markCompleted();
+                markCompleted({ score: correctCount, total: totalItems });
                 btnCheck.style.display = 'none';
                 // .ex-result a un `display: flex !important` en CSS qui écraserait un simple
                 // style.display = 'none' : la boîte resterait visible avec son dernier contenu
@@ -2343,7 +2373,7 @@ class DaspalecteTranslator {
             this.toggleReadingRecording(recordBtn, feedbackEl, () => {
                 // "Continuer" n'apparaît qu'une fois l'élève enregistré
                 btnNext.style.display = 'block';
-                markCompleted();
+                markCompleted({ score: 1, total: 1 });
             });
         };
     }
@@ -2467,7 +2497,7 @@ class DaspalecteTranslator {
 
             if (passed) {
                 btnNext.style.display = 'block';
-                markCompleted();
+                markCompleted({ score: correctWords, total: totalWords });
                 resultEl.innerHTML = `<p class="ex-score ex-score-success">Bravo ! ${correctWords} / ${totalWords} mots retrouvés — pas grave pour le reste, tu peux continuer.</p>`;
             } else {
                 resultEl.innerHTML = `<p class="ex-score ex-score-fail">${correctWords} / ${totalWords} mots retrouvés — trouve au moins ${requiredWords} mots pour continuer. Corrige tes réponses et vérifie à nouveau.</p>`;
@@ -2483,7 +2513,7 @@ class DaspalecteTranslator {
 
     // hintIndices : Set des index d'items pour lesquels afficher l'indice syllabique (uniquement
     // les réponses fausses lors de la tentative précédente, pas les bonnes déjà trouvées).
-    renderCloze(ex, container, btnCheck, btnNext, hintIndices = new Set(), markCompleted = () => {}) {
+    renderCloze(ex, container, btnCheck, btnNext, hintIndices = new Set(), markCompleted = () => {}, keptAnswers = {}) {
         container.innerHTML = `
             <div class="cloze-exercise">
                 <div class="cloze-items" id="cloze-list"></div>
@@ -2502,6 +2532,18 @@ class DaspalecteTranslator {
             const html = item.text.replace('___', `<input type="text" class="cloze-input" data-idx="${idx}" autocomplete="off"${hint}>`);
             div.innerHTML = `<span class="bullet">${idx + 1}</span> <span>${html}</span>`;
             listDiv.appendChild(div);
+
+            // Réponses déjà justes : pré-remplies et verrouillées plutôt que remises à zéro —
+            // l'élève ne refait que ce qu'il a raté. Valeur posée via le DOM (pas dans la chaîne
+            // HTML) pour ne pas casser l'attribut si la réponse contient une apostrophe.
+            if (keptAnswers[idx] !== undefined) {
+                const keptInput = div.querySelector('.cloze-input');
+                if (keptInput) {
+                    keptInput.value = keptAnswers[idx];
+                    keptInput.classList.add('correct');
+                    keptInput.readOnly = true;
+                }
+            }
         });
 
         btnCheck.style.display = 'block';
@@ -2509,6 +2551,7 @@ class DaspalecteTranslator {
         btnCheck.onclick = () => {
             let correctCount = 0;
             const wrongIndices = new Set();
+            const keptForRetry = { ...keptAnswers };
             ex.items.forEach((item, idx) => {
                 const input = container.querySelector(`.cloze-input[data-idx="${idx}"]`);
 
@@ -2521,6 +2564,7 @@ class DaspalecteTranslator {
                 if (input.value.trim().toLowerCase() === item.answer.toLowerCase()) {
                     input.classList.add('correct');
                     correctCount++;
+                    keptForRetry[idx] = input.value.trim();
                 } else {
                     input.classList.add('error');
                     wrongIndices.add(idx);
@@ -2531,7 +2575,7 @@ class DaspalecteTranslator {
 
             if (accuracy >= 0.7) {
                 btnNext.style.display = 'block';
-                markCompleted();
+                markCompleted({ score: correctCount, total: ex.items.length });
                 btnCheck.style.display = 'none';
                 resultEl.style.setProperty('display', 'none', 'important');
                 resultEl.innerHTML = '';
@@ -2548,7 +2592,7 @@ class DaspalecteTranslator {
                     <button type="button" class="ex-btn secondary ex-retry-btn">💡 Recommencer avec indice</button>
                 `;
                 resultEl.querySelector('.ex-retry-btn').onclick = () => {
-                    this.renderCloze(ex, container, btnCheck, btnNext, wrongIndices, markCompleted);
+                    this.renderCloze(ex, container, btnCheck, btnNext, wrongIndices, markCompleted, keptForRetry);
                 };
             }
         };
@@ -2577,6 +2621,20 @@ class DaspalecteTranslator {
 
     wordMatchKey(str) {
         return this.stripGenderNumber(this.normalizeSentenceWord(str));
+    }
+
+    // Deux formes comptent comme le même mot de vocabulaire si elles partagent un radical d'au
+    // moins 4 lettres. Va plus loin que l'accord en genre/nombre : couvre aussi le transfert
+    // d'une classe grammaticale à l'autre ("critique" → "il critiqua", "rapide" → "rapidement"),
+    // qui est exactement ce que l'exercice cherche à valoriser — sans cela l'élève qui transforme
+    // le mot serait bloqué par le compteur avant même la vérification de Claude.
+    sameVocabularyWord(a, b) {
+        const ka = this.wordMatchKey(a);
+        const kb = this.wordMatchKey(b);
+        if (ka === kb) return true;
+        let i = 0;
+        while (i < ka.length && i < kb.length && ka[i] === kb[i]) i++;
+        return i >= 4;
     }
 
     extractSentenceWords(text) {
@@ -2609,8 +2667,8 @@ class DaspalecteTranslator {
 
         // Recalcule les mots utilisés à chaque frappe et met à jour le compteur + les étiquettes.
         const updateUsedWords = () => {
-            const sentenceWords = new Set(this.extractSentenceWords(textarea.value));
-            const used = ex.words.filter(w => sentenceWords.has(this.wordMatchKey(w)));
+            const sentenceWords = this.extractSentenceWords(textarea.value);
+            const used = ex.words.filter(w => sentenceWords.some(sw => this.sameVocabularyWord(sw, w)));
             const usedSet = new Set(used);
             chips.forEach(chip => {
                 chip.classList.toggle('sentence-word-used', usedSet.has(chip.dataset.word));
@@ -2679,7 +2737,7 @@ class DaspalecteTranslator {
 
                 if (overallValid) {
                     btnNext.style.display = 'block';
-                    markCompleted();
+                    markCompleted({ score: 1, total: 1 });
                     btnCheck.style.display = 'none';
                 } else {
                     btnCheck.disabled = false;
@@ -3247,7 +3305,85 @@ class DaspalecteTranslator {
         this.sendScoreToTeacher(mcqCorrect, mcqTotal, matchingCorrect, totalPairs, percentage);
     }
 
+    /**
+     * Envoie un evenement a l'app web de resultats, via background.js (c'est lui
+     * qui tient la session, la file d'attente et le jeton Google).
+     *
+     * Volontairement silencieux : le suivi ne doit jamais interrompre une
+     * activite pedagogique. Si l'eleve n'est pas connecte ou hors ligne,
+     * l'evenement attend dans la file.
+     */
+    track(eventType, payload) {
+        try {
+            chrome.runtime.sendMessage(
+                { type: 'TRACK', eventType, payload: payload || {} },
+                () => { void chrome.runtime.lastError; }
+            );
+        } catch (error) {
+            // "Extension context invalidated" quand l'extension vient d'etre rechargee.
+            console.debug('[CONTENT] suivi indisponible:', error);
+        }
+    }
+
+    /**
+     * Enregistre la réussite d'un exercice. Appelé une seule fois par exercice,
+     * depuis `markCompleted` (voir displayExercises).
+     */
+    trackExerciseResult(exercise, result, attempts) {
+        if (!exercise) return;
+        const score = result && typeof result.score === 'number' ? result.score : 1;
+        const total = result && typeof result.total === 'number' ? result.total : 1;
+
+        this.track('exercise', {
+            exerciseType: exercise.type,
+            score,
+            total,
+            attempts,
+            words: this.exerciseWords(exercise)
+        });
+    }
+
+    /**
+     * Mots de vocabulaire mis en jeu par un exercice. Chaque type a sa propre
+     * forme de données ; on ratisse large plutôt que d'écrire sept cas.
+     */
+    exerciseWords(exercise) {
+        const found = new Set();
+        const visit = (value, depth) => {
+            if (depth > 3 || found.size >= 50) return;
+            if (typeof value === 'string') {
+                const word = value.trim();
+                // On veut des mots, pas des phrases ni des consignes.
+                if (word && word.length <= 40 && !word.includes(' ')) found.add(word);
+            } else if (Array.isArray(value)) {
+                value.forEach(item => visit(item, depth + 1));
+            } else if (value && typeof value === 'object') {
+                for (const key of ['word', 'fr', 'french', 'mainWord', 'answer']) {
+                    if (typeof value[key] === 'string') visit(value[key], depth + 1);
+                }
+            }
+        };
+
+        for (const key of ['pairs', 'items', 'words', 'families']) {
+            visit(exercise[key], 0);
+        }
+        return [...found];
+    }
+
     async sendScoreToTeacher(mcqCorrect, mcqTotal, matchingScore, matchingTotal, percentage) {
+        this.track('reading_test', {
+            mcqScore: mcqCorrect,
+            mcqTotal,
+            matchingScore,
+            matchingTotal,
+            percentage,
+            pageUrl: window.location.href,
+            pageTitle: document.title
+        });
+
+        // TODO (fin du chantier plateforme) : supprimer l'envoi vers la Google
+        // Sheet ci-dessous. On le garde tant que l'app web n'est pas deployee,
+        // pour ne pas perdre de scores pendant la transition.
         try {
             await fetch('https://script.google.com/macros/s/AKfycbw-kVeRoxGDjnqy6AoGp3gA8rp68IOCj6_qBwPWURYMoIh15gVCzLrvAx6Wrkv9DJxu8Q/exec', {
                 method: 'POST',
@@ -3574,6 +3710,12 @@ class DaspalecteTranslator {
             }
 
             const data = await response.json();
+
+            this.track('capture', {
+                difficultWords: Array.isArray(data.difficultWords) ? data.difficultWords.length : 0,
+                nativeLanguage: this.nativeLanguage
+            });
+
             this.displayCaptureResult(data, croppedDataUrl);
         } catch (error) {
             console.error('[CONTENT] Erreur analyzeScreenshot:', error);
@@ -3990,6 +4132,12 @@ class DaspalecteTranslator {
                 translation: translation
             });
 
+            this.track('word', {
+                word: text,
+                translation: translation,
+                nativeLanguage: this.nativeLanguage
+            });
+
         } catch (error) {
             loadingElement.textContent = '❌';
             loadingElement.className = 'daspalecte-translation daspalecte-error';
@@ -4163,6 +4311,12 @@ class DaspalecteTranslator {
                 type: 'WORD_SELECTED',
                 word: text,
                 translation: translation
+            });
+
+            this.track('word', {
+                word: text,
+                translation: translation,
+                nativeLanguage: this.nativeLanguage
             });
 
         } catch (error) {

@@ -1,0 +1,37 @@
+{
+  "name": "web",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "next dev",
+    "dev:emul": "FIRESTORE_EMULATOR_HOST=127.0.0.1:8080 FIREBASE_AUTH_EMULATOR_HOST=127.0.0.1:9099 next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "eslint",
+    "emulators": "cd .. && PATH=\"/usr/local/opt/openjdk/bin:$PATH\" firebase emulators:start --project essai-27712 --only auth,firestore",
+    "test": "npm run test:rules && npm run test:ingest",
+    "test:rules": "FIRESTORE_EMULATOR_HOST=127.0.0.1:8080 node --test 'tests/*.test.mjs'",
+    "test:ingest": "FIRESTORE_EMULATOR_HOST=127.0.0.1:8080 tsx --conditions react-server --test 'tests/*.test.ts'",
+    "seed": "FIRESTORE_EMULATOR_HOST=127.0.0.1:8080 tsx --conditions react-server scripts/seed-emulator.ts"
+  },
+  "dependencies": {
+    "firebase": "^12.17.0",
+    "firebase-admin": "^14.2.0",
+    "next": "16.2.12",
+    "react": "19.2.4",
+    "react-dom": "19.2.4",
+    "server-only": "^0.0.1"
+  },
+  "devDependencies": {
+    "@firebase/rules-unit-testing": "^5.0.1",
+    "@tailwindcss/postcss": "^4",
+    "@types/node": "^20",
+    "@types/react": "^19",
+    "@types/react-dom": "^19",
+    "eslint": "^9",
+    "eslint-config-next": "16.2.12",
+    "tailwindcss": "^4",
+    "tsx": "^4.23.5",
+    "typescript": "^5"
+  }
+}

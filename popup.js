@@ -170,3 +170,156 @@ document.getElementById('btn-pdf').addEventListener('click', async () => {
         window.close();
     }
 });
+
+// ============================================================
+// COMPTE — la connexion Google conditionne l'accès à l'extension
+// ============================================================
+//
+// La popup est la porte d'entrée : tant que l'élève n'est pas identifié, elle
+// n'affiche que l'écran de connexion. C'est aussi le seul endroit de
+// l'extension où une fenêtre de consentement Google peut s'ouvrir ;
+// background.js ne demande ensuite que des jetons silencieux.
+//
+// Un point délibéré : si le service worker ne répond pas du tout (message en
+// erreur, extension en cours de rechargement), on laisse passer. Verrouiller un
+// élève dehors à cause d'un hoquet technique serait pire que le laisser entrer.
+
+const loginScreen = document.getElementById('login-screen');
+const loginText = document.getElementById('login-text');
+const loginBtn = document.getElementById('login-btn');
+const appScreen = document.getElementById('app-screen');
+const accountLine = document.getElementById('account-line');
+const accountStatus = document.getElementById('account-status');
+const accountBtn = document.getElementById('btn-account');
+const accountSignOutBtn = document.getElementById('account-signout-btn');
+
+const LOGIN_PROMPT = 'Connecte-toi avec ton compte de l’école pour utiliser Daspalecte.';
+
+// Traduit le message brut de chrome.identity en explication utilisable.
+function describeSignInFailure(reason) {
+    const raw = String(reason || '').toLowerCase();
+    if (raw.includes('not granted') || raw.includes('rejected') || raw.includes('canceled') || raw.includes('cancelled')) {
+        return 'Connexion annulée. Réessaie quand tu veux.';
+    }
+    if (raw.includes('not signed in')) {
+        return 'Ce profil Chrome n’est connecté à aucun compte Google.';
+    }
+    if (raw) {
+        return 'Google a refusé la connexion. Vérifie que tu utilises bien le compte de ton école.';
+    }
+    return 'La connexion a échoué. Réessaie.';
+}
+
+function showLogin(message, isError) {
+    loginText.textContent = message || LOGIN_PROMPT;
+    loginText.classList.toggle('is-error', Boolean(isError));
+    loginScreen.style.display = 'flex';
+    appScreen.style.display = 'none';
+    // L'icône du coin n'a pas de sens tant qu'il n'y a pas de compte.
+    if (accountBtn) accountBtn.style.display = 'none';
+    if (accountLine) accountLine.style.display = 'none';
+}
+
+function showApp(account, blocked) {
+    loginScreen.style.display = 'none';
+    appScreen.style.display = 'block';
+    if (accountBtn) accountBtn.style.display = 'flex';
+
+    if (account && account.email) {
+        accountStatus.textContent = blocked
+            ? `${account.email} — non inscrit par un professeur, tes résultats ne sont pas enregistrés.`
+            : account.email;
+    } else {
+        accountStatus.textContent = 'Compte non identifié';
+    }
+}
+
+function refreshAccount() {
+    if (!loginScreen) return;
+    try {
+        chrome.runtime.sendMessage({ type: 'ANALYTICS_ACCOUNT' }, (state) => {
+            if (chrome.runtime.lastError) {
+                // Le service worker n'a pas répondu : on n'enferme personne dehors.
+                console.warn('[POPUP] état du compte indisponible, accès laissé ouvert.');
+                showApp(null, false);
+                return;
+            }
+            if (state && state.account && state.account.email) {
+                showApp(state.account, state.blocked);
+            } else {
+                showLogin(LOGIN_PROMPT, false);
+            }
+        });
+    } catch (e) {
+        showApp(null, false);
+    }
+}
+
+if (loginBtn) {
+    loginBtn.addEventListener('click', () => {
+        loginBtn.disabled = true;
+        showLogin('Connexion en cours…', false);
+        try {
+            chrome.runtime.sendMessage({ type: 'ANALYTICS_SIGN_IN' }, (result) => {
+                loginBtn.disabled = false;
+                if (chrome.runtime.lastError || !result || !result.ok) {
+                    // Le motif du refus est décisif : un compte hors de l'école est
+                    // bloqué par Google, ce qui n'a rien à voir avec un échec réseau.
+                    const reason = (result && result.error)
+                        || (chrome.runtime.lastError && chrome.runtime.lastError.message)
+                        || '';
+                    console.warn('[POPUP] connexion refusée :', reason);
+                    showLogin(describeSignInFailure(reason), true);
+                    return;
+                }
+                refreshAccount();
+            });
+        } catch (e) {
+            loginBtn.disabled = false;
+            showLogin('La connexion a échoué. Réessaie.', true);
+        }
+    });
+}
+
+if (accountBtn) {
+    accountBtn.addEventListener('click', () => {
+        const open = accountLine.style.display !== 'none';
+        accountLine.style.display = open ? 'none' : 'flex';
+        accountBtn.setAttribute('aria-expanded', String(!open));
+    });
+}
+
+if (accountSignOutBtn) {
+    accountSignOutBtn.addEventListener('click', () => {
+        try {
+            chrome.runtime.sendMessage({ type: 'ANALYTICS_SIGN_OUT' }, () => {
+                void chrome.runtime.lastError;
+                accountLine.style.display = 'none';
+                if (accountBtn) accountBtn.setAttribute('aria-expanded', 'false');
+                showLogin(LOGIN_PROMPT, false);
+            });
+        } catch (e) { /* extension context invalidated */ }
+    });
+}
+
+refreshAccount();
+
+// Bouton « Mes résultats » : ouvre l'app web. L'URL vient du service worker
+// pour qu'elle ne soit definie qu'a un seul endroit (analytics.js), et qu'un
+// basculement local / production n'oblige pas a toucher deux fichiers.
+const siteBtn = document.getElementById('btn-site');
+
+if (siteBtn) {
+    siteBtn.addEventListener('click', () => {
+        try {
+            chrome.runtime.sendMessage({ type: 'ANALYTICS_APP_URL' }, (result) => {
+                if (chrome.runtime.lastError || !result || !result.url) {
+                    console.warn('[POPUP] URL du site indisponible.');
+                    return;
+                }
+                chrome.tabs.create({ url: result.url });
+                window.close();
+            });
+        } catch (e) { /* extension context invalidated */ }
+    });
+}

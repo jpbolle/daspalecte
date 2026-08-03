@@ -1,0 +1,183 @@
+<!--
+  NON SERVI DIRECTEMENT — reference lisible uniquement.
+  doGet() dans Code.gs sert desormais la constante RECORDING_PAGE_HTML (copie de ce fichier
+  en template string JS), pas ce fichier .html : HtmlService.createHtmlOutputFromFile() sur ce
+  fichier corrompait son contenu ET bloquait l'acces microphone (voir le commentaire sur
+  RECORDING_PAGE_HTML dans Code.gs pour le detail, constate en test reel).
+  Pour editer : modifier ICI (plus lisible/colore qu'une string geante), PUIS recopier
+  manuellement le contenu <head>/<body> a jour dans RECORDING_PAGE_HTML (Code.gs), puis
+  clasp push. Les deux copies doivent rester synchronisees a la main.
+-->
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>Enregistrer ma lecture — Daspalecte</title>
+  <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@700&family=Inter:wght@400;600&display=swap" rel="stylesheet">
+  <style>
+    body {
+      margin: 0;
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
+      background: #faf6f0;
+      color: #3d3832;
+      padding: 28px 24px;
+      text-align: center;
+      box-sizing: border-box;
+    }
+
+    h1 {
+      font-family: 'Playfair Display', Georgia, serif;
+      font-size: 1.1rem;
+      color: #2d6a5a;
+      margin: 0 0 10px;
+    }
+
+    p {
+      font-size: 0.85rem;
+      color: #6b6259;
+      line-height: 1.5;
+    }
+
+    button {
+      font-family: 'Playfair Display', Georgia, serif;
+      font-weight: bold;
+      font-size: 0.9rem;
+      padding: 12px 20px;
+      border-radius: 4px;
+      border: none;
+      background: linear-gradient(90deg, #2d6a5a, #357a68);
+      color: #ffffff;
+      cursor: pointer;
+      margin-top: 8px;
+    }
+
+    button:hover {
+      filter: brightness(1.06);
+    }
+
+    button.recording {
+      background: #b44040;
+    }
+
+    button:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+
+    #rec-status {
+      margin-top: 14px;
+      font-size: 0.8rem;
+      color: #5a534b;
+      min-height: 1.4em;
+    }
+  </style>
+</head>
+<body>
+  <h1>Enregistre ta lecture à voix haute</h1>
+  <p>Clique, lis le texte entier à voix haute, puis clique à nouveau pour arrêter.<br>
+     Le résultat est renvoyé automatiquement à la fenêtre d'exercices.</p>
+  <button id="rec-btn" type="button">🎤 Démarrer l'enregistrement</button>
+  <p id="rec-status"></p>
+
+  <script>
+    // Page servie par le deploiement "Application Web" de ce projet (Code.gs: doGet(),
+    // getRecordingPageUrl()), PAS par la sidebar/le dialogue directement : une URL blob:
+    // generee depuis la sidebar/le dialogue s'est averee ne pas etre un contexte securise
+    // aux yeux de Chrome (icone "connexion non securisee", confirme en test reel), et
+    // SpeechRecognition/getUserMedia refusent de fonctionner sans contexte securise —
+    // silencieusement, sans meme proposer la demande de permission micro. Une vraie URL
+    // https://script.google.com/... de premier niveau resout ce probleme.
+    //
+    // Le resultat n'est PAS renvoye par window.opener.postMessage() (bloque par Google en
+    // interne entre cette origine, script.google.com, et celle d'ExercisesDialog.html,
+    // *.googleusercontent.com — confirme en test reel) NI par google.script.run (meme page,
+    // mais APPELE DEPUIS une fenetre ouverte via window.open() : la bibliotheque cliente Apps
+    // Script tente alors une poignee de main automatique vers son window.opener, que Google
+    // bloque pour la meme raison — boucle de "dropping postMessage" constatee en test reel).
+    // Un simple fetch() HTTP vers ce meme deploiement (?action=store&...), lu cote serveur
+    // par doGet() dans Code.gs, n'a aucun de ces deux problemes.
+    const btn = document.getElementById('rec-btn');
+    const status = document.getElementById('rec-status');
+    const Ctor = window.SpeechRecognition || window.webkitSpeechRecognition;
+    let recognition = null;
+    let recording = false;
+    let finalTranscript = '';
+
+    if (!Ctor) {
+      status.textContent = "La reconnaissance vocale n'est pas disponible sur ce navigateur.";
+      btn.disabled = true;
+    }
+
+    function storeUrlBase() {
+      return window.location.origin + window.location.pathname;
+    }
+
+    function reportResult(transcript) {
+      fetch(storeUrlBase() + '?action=store&transcript=' + encodeURIComponent(transcript)).catch(() => {});
+    }
+
+    function reportError(message) {
+      fetch(storeUrlBase() + '?action=store&error=' + encodeURIComponent(message)).catch(() => {});
+    }
+
+    btn.onclick = () => {
+      if (recording) { if (recognition) recognition.stop(); return; }
+      finalTranscript = '';
+      recognition = new Ctor();
+      recognition.lang = 'fr-FR';
+      recognition.continuous = true;
+      // interimResults=true uniquement pour donner un retour visuel en temps reel (diagnostic :
+      // permet de voir si le moteur capte quelque chose AVANT la fin de l'enregistrement, plutot
+      // que d'attendre onend pour savoir si ca a marche). Seuls les segments "isFinal" sont
+      // conserves dans finalTranscript, comme avant.
+      recognition.interimResults = true;
+
+      // Etapes du cycle de vie de la reconnaissance, affichees en direct dans #rec-status —
+      // permet de voir precisement ou ca bloque (le micro ne s'active jamais ? du son est
+      // capte mais pas reconnu comme parole ? de la parole est detectee mais aucun texte final
+      // n'est produit ?) plutot que de deviner apres un "Rien n'a ete reconnu" generique.
+      recognition.onstart = () => { status.textContent = '🎙️ Micro activé — parle maintenant...'; };
+      recognition.onaudiostart = () => { status.textContent = '🎙️ Audio capté — parle maintenant...'; };
+      recognition.onsoundstart = () => { status.textContent = '🔊 Son détecté...'; };
+      recognition.onspeechstart = () => { status.textContent = '🗣️ Parole détectée...'; };
+      recognition.onspeechend = () => { status.textContent = '⏳ Traitement de la parole...'; };
+      recognition.onnomatch = () => { status.textContent = "⚠️ Son capté mais aucun mot reconnu."; };
+
+      recognition.onresult = (event) => {
+        let interim = '';
+        for (let i = event.resultIndex; i < event.results.length; i++) {
+          if (event.results[i].isFinal) finalTranscript += event.results[i][0].transcript + ' ';
+          else interim += event.results[i][0].transcript;
+        }
+        if (interim) status.textContent = '✍️ ' + interim;
+      };
+
+      recognition.onerror = (event) => {
+        const message = event.error === 'not-allowed'
+          ? "Micro refusé — autorise l'accès au micro pour utiliser cette fonction."
+          : 'Erreur de reconnaissance vocale (' + event.error + '), réessaie.';
+        status.textContent = message;
+        reportError(message);
+      };
+
+      recognition.onend = () => {
+        recording = false;
+        btn.classList.remove('recording');
+        btn.textContent = "🎤 Démarrer l'enregistrement";
+        if (finalTranscript.trim()) {
+          status.textContent = 'Terminé — tu peux fermer cette fenêtre.';
+          reportResult(finalTranscript.trim());
+        } else {
+          status.textContent = "Rien n'a été reconnu, réessaie.";
+        }
+      };
+
+      recording = true;
+      btn.classList.add('recording');
+      btn.textContent = "⏹ Arrêter l'enregistrement";
+      status.textContent = 'Démarrage du micro...';
+      recognition.start();
+    };
+  </script>
+</body>
+</html>

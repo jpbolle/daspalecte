@@ -1,0 +1,949 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <base target="_top">
+  <meta charset="utf-8">
+  <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;700;900&family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    /* Variables portees depuis themes.css (bloc Classica), identiques a
+       ExercisesDialog.html — cette page est une fenetre independante (dialogue Apps
+       Script), elle ne partage pas les styles de la sidebar. */
+    :root {
+      --t-bg: #faf6f0;
+      --t-bg-card: #ffffff;
+      --t-primary: #2d6a5a;
+      --t-accent: #d4944c;
+      --t-text: #3d3832;
+      --t-text-secondary: #5a534b;
+      --t-text-muted: #6b6259;
+      --t-text-dim: #766c61;
+      --t-text-on-accent: #2e1c0a;
+      --t-glass-bg: rgba(45, 106, 90, 0.04);
+      --t-glass-bg-hover: rgba(45, 106, 90, 0.08);
+      --t-border: #d5cec4;
+      --t-danger: #b44040;
+      --t-success: #2d8a4e;
+      --t-warning: #c4862e;
+      --t-primary-a15: rgba(45, 106, 90, 0.15);
+      --t-primary-a30: rgba(45, 106, 90, 0.30);
+      --t-radius: 4px;
+      --t-radius-sm: 4px;
+      --t-radius-lg: 8px;
+      --t-font-title: 'Playfair Display', Georgia, serif;
+      --t-font-body: 'Inter', -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
+      --t-translation-bg: #2d6a5a;
+      --t-translation-text: #ffffff;
+
+      /* Ombre douce uniforme — charte Classica : jamais de glow colore (les
+         box-shadow "0 0 30px" du theme Cyberpunk de content.css ne sont pas portees). */
+      --t-shadow-soft: 0 2px 8px rgba(0, 0, 0, 0.08);
+    }
+
+    /* Meme mise en page que ExercisesDialog.html : dialogue quasi plein ecran (DIALOG_WIDTH
+       dans Code.gs), fond opaque sur toute la surface pour masquer le texte du document — qui
+       est precisement ce sur quoi porte le test —, et colonne flex centree qui aligne l'en-tete,
+       le corps et le pied sur une meme largeur en poussant le pied en bas de la fenetre. */
+    html {
+      height: 100%;
+      background: var(--t-bg);
+    }
+
+    body {
+      margin: 0;
+      padding: 26px 32px 24px;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      background: var(--t-bg);
+      color: var(--t-text);
+      font-family: var(--t-font-body);
+      box-sizing: border-box;
+    }
+
+    body > * {
+      width: 100%;
+      max-width: 1000px;
+      flex-shrink: 0;
+    }
+
+    /* Le bloc principal occupe la hauteur restante et place son propre pied en bas. */
+    #ct-main {
+      flex: 1 1 auto;
+      min-height: 0;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .ct-body {
+      flex: 1 1 auto;
+      min-height: 0;
+      overflow-y: auto;
+    }
+
+    #ct-loader {
+      flex: 1 1 auto;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .ct-dialog-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      border-bottom: 1px solid var(--t-border);
+      padding-bottom: 12px;
+      margin-bottom: 18px;
+    }
+
+    .ct-dialog-header h1 {
+      font-family: var(--t-font-title);
+      font-size: 1.15rem;
+      color: var(--t-primary);
+      margin: 0;
+    }
+
+    .ct-close-x {
+      background: none;
+      border: none;
+      color: var(--t-text-muted);
+      font-size: 18px;
+      line-height: 1;
+      cursor: pointer;
+      padding: 4px 6px;
+      border-radius: var(--t-radius-sm);
+    }
+
+    .ct-close-x:hover {
+      background: var(--t-glass-bg-hover);
+      color: var(--t-danger);
+    }
+
+    .ct-loader {
+      text-align: center;
+      padding: 60px 20px;
+      color: var(--t-text-muted);
+      font-size: 0.9rem;
+    }
+
+    .ct-spinner {
+      width: 34px;
+      height: 34px;
+      margin: 0 auto 16px;
+      border: 3px solid var(--t-glass-bg-hover);
+      border-top-color: var(--t-primary);
+      border-radius: 50%;
+      animation: ct-spin 0.9s linear infinite;
+    }
+
+    @keyframes ct-spin {
+      to { transform: rotate(360deg); }
+    }
+
+    .ct-step-indicator {
+      color: var(--t-accent);
+      font-family: var(--t-font-title);
+      font-size: 0.72rem;
+      letter-spacing: 1px;
+      text-transform: uppercase;
+      display: block;
+      margin-bottom: 14px;
+    }
+
+    .ct-section {
+      background: var(--t-glass-bg);
+      border: 1px solid var(--t-border);
+      border-radius: var(--t-radius-lg);
+      padding: 20px;
+    }
+
+    .ct-section-title {
+      color: var(--t-accent);
+      font-family: var(--t-font-title);
+      font-size: 0.8rem;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      margin: 0 0 18px 0;
+    }
+
+    /* QCM */
+    .ct-question {
+      margin-bottom: 22px;
+      padding-bottom: 22px;
+      border-bottom: 1px solid var(--t-border);
+    }
+
+    .ct-question:last-child {
+      margin-bottom: 0;
+      padding-bottom: 0;
+      border-bottom: none;
+    }
+
+    .ct-question-header {
+      display: flex;
+      gap: 12px;
+      align-items: flex-start;
+      margin-bottom: 12px;
+    }
+
+    .ct-question-number {
+      background: var(--t-accent);
+      color: var(--t-text-on-accent);
+      width: 26px;
+      height: 26px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 0.78rem;
+      font-family: var(--t-font-title);
+      font-weight: bold;
+      flex-shrink: 0;
+    }
+
+    .ct-question-text {
+      color: var(--t-text-secondary);
+      font-size: 0.95rem;
+      line-height: 1.6;
+    }
+
+    .ct-options {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      margin-left: 38px;
+    }
+
+    .ct-option {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 10px 14px;
+      background: var(--t-bg-card);
+      border: 1px solid var(--t-border);
+      border-radius: var(--t-radius-lg);
+      cursor: pointer;
+      transition: background 0.2s ease, border-color 0.2s ease;
+    }
+
+    .ct-option:hover {
+      background: var(--t-glass-bg-hover);
+      border-color: var(--t-primary-a30);
+    }
+
+    .ct-radio {
+      appearance: none;
+      -webkit-appearance: none;
+      width: 18px;
+      height: 18px;
+      margin: 0;
+      border: 2px solid var(--t-text-dim);
+      border-radius: 50%;
+      background: transparent;
+      cursor: pointer;
+      flex-shrink: 0;
+      position: relative;
+    }
+
+    .ct-radio:checked {
+      border-color: var(--t-primary);
+      background: var(--t-primary-a15);
+    }
+
+    .ct-radio:checked::after {
+      content: "";
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      width: 8px;
+      height: 8px;
+      background: var(--t-primary);
+      border-radius: 50%;
+    }
+
+    .ct-option-text {
+      color: var(--t-text-muted);
+      font-size: 0.9rem;
+      line-height: 1.4;
+    }
+
+    .ct-option.ct-correct {
+      border-color: var(--t-success);
+      background: rgba(45, 138, 78, 0.10);
+    }
+
+    .ct-option.ct-correct .ct-option-text {
+      color: var(--t-success);
+    }
+
+    .ct-option.ct-incorrect {
+      border-color: var(--t-danger);
+      background: rgba(180, 64, 64, 0.10);
+    }
+
+    .ct-option.ct-incorrect .ct-option-text {
+      color: var(--t-danger);
+    }
+
+    /* Appariement — meme structure que renderExMatching (ExercisesDialog.html) */
+    .ct-matching-wrap {
+      position: relative;
+    }
+
+    .ct-matching-cols {
+      display: flex;
+      gap: 40px;
+      justify-content: space-between;
+    }
+
+    .ct-matching-col {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      flex: 1;
+    }
+
+    .ct-match-item {
+      background: var(--t-bg-card);
+      border: 1px solid var(--t-border);
+      border-radius: var(--t-radius-lg);
+      padding: 10px 14px;
+      font-size: 0.9rem;
+      color: var(--t-text);
+      cursor: pointer;
+      text-align: center;
+      transition: background 0.2s ease, border-color 0.2s ease;
+      position: relative;
+      z-index: 2;
+    }
+
+    .ct-match-item:hover {
+      background: var(--t-glass-bg-hover);
+    }
+
+    .ct-match-item.selected {
+      border-color: var(--t-primary);
+      background: var(--t-glass-bg-hover);
+    }
+
+    .ct-match-item.ct-correct {
+      border-color: var(--t-success);
+      background: rgba(45, 138, 78, 0.10);
+      color: var(--t-success);
+    }
+
+    .ct-match-item.ct-incorrect {
+      border-color: var(--t-danger);
+      background: rgba(180, 64, 64, 0.10);
+      color: var(--t-danger);
+    }
+
+    /* Resultats */
+    .ct-footer {
+      flex-shrink: 0;
+      margin-top: 22px;
+      padding-top: 16px;
+      border-top: 1px solid var(--t-border);
+    }
+
+    .ct-nav {
+      display: flex;
+      justify-content: center;
+      gap: 14px;
+    }
+
+    .btn, .btn-secondary {
+      border: none;
+      border-radius: var(--t-radius);
+      padding: 10px 20px;
+      font-family: var(--t-font-title);
+      font-weight: bold;
+      font-size: 0.8rem;
+      letter-spacing: 0.3px;
+      cursor: pointer;
+      transition: filter 0.2s ease, box-shadow 0.2s ease;
+    }
+
+    .btn {
+      background: linear-gradient(90deg, #2d6a5a, #357a68);
+      color: #ffffff;
+    }
+
+    .btn-secondary {
+      background: var(--t-bg-card);
+      border: 1px solid var(--t-border);
+      color: var(--t-text-secondary);
+    }
+
+    .btn:hover, .btn-secondary:hover {
+      filter: brightness(1.06);
+      box-shadow: var(--t-shadow-soft);
+    }
+
+    .btn:disabled, .btn-secondary:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+      filter: none;
+      box-shadow: none;
+    }
+
+    .ct-results {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 18px;
+      padding: 8px 0;
+    }
+
+    .ct-score-display {
+      display: flex;
+      align-items: center;
+      gap: 28px;
+    }
+
+    .ct-score-circle {
+      width: 92px;
+      height: 92px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      border: 4px solid var(--t-border);
+      background: var(--t-bg-card);
+      box-shadow: var(--t-shadow-soft);
+    }
+
+    .ct-score-good { border-color: var(--t-success); }
+    .ct-score-ok { border-color: var(--t-warning); }
+    .ct-score-bad { border-color: var(--t-danger); }
+
+    .ct-score-number {
+      font-family: var(--t-font-title);
+      font-size: 1.55rem;
+      font-weight: bold;
+      color: var(--t-text);
+    }
+
+    .ct-score-details {
+      font-size: 0.9rem;
+      color: var(--t-text-muted);
+      line-height: 1.8;
+    }
+
+    .ct-score-details p {
+      margin: 0;
+    }
+
+    .ct-score-total {
+      color: var(--t-primary);
+      font-weight: 600;
+      font-size: 1rem;
+      margin-top: 5px;
+    }
+
+    .ct-message {
+      text-align: center;
+      padding: 50px 20px;
+      color: var(--t-text-secondary);
+      font-size: 0.92rem;
+      line-height: 1.6;
+    }
+
+    /* Traducteur mot a mot dans les questions — meme bulle que le texte de
+       l'exercice Lecture (ExercisesDialog.html: .daspalecte-translation-bubble). */
+    .ct-word {
+      cursor: pointer;
+      position: relative;
+      border-radius: 2px;
+      padding: 0 1px;
+    }
+
+    .ct-word:hover {
+      background: var(--t-glass-bg-hover);
+    }
+
+    .daspalecte-translation-bubble {
+      position: absolute;
+      bottom: 115%;
+      left: 50%;
+      transform: translateX(-50%);
+      background: var(--t-translation-bg);
+      color: var(--t-translation-text);
+      padding: 4px 9px;
+      border-radius: var(--t-radius-sm);
+      font-size: 0.78rem;
+      white-space: nowrap;
+      z-index: 10;
+      box-shadow: var(--t-shadow-soft);
+    }
+  </style>
+</head>
+<body>
+  <div class="ct-dialog-header">
+    <h1>Test de lecture — Daspalecte</h1>
+    <button id="ct-close-x" class="ct-close-x" type="button" aria-label="Fermer">✕</button>
+  </div>
+
+  <div id="ct-loader" class="ct-loader">
+    <div class="ct-spinner"></div>
+    <p id="ct-loader-text">Lecture du document...</p>
+  </div>
+
+  <div id="ct-main" style="display:none;">
+    <span class="ct-step-indicator" id="ct-step-indicator">1 / 2</span>
+    <div class="ct-body">
+      <div class="ct-page" id="ct-page-1">
+        <div class="ct-section">
+          <h3 class="ct-section-title">Questions de compréhension</h3>
+          <div id="ct-mcq-container"></div>
+        </div>
+      </div>
+      <div class="ct-page" id="ct-page-2" style="display:none;">
+        <div class="ct-section">
+          <h3 class="ct-section-title">Exercice d'appariement</h3>
+          <div id="ct-matching-container"></div>
+        </div>
+      </div>
+    </div>
+    <div class="ct-footer" id="ct-footer">
+      <div class="ct-nav" id="ct-nav">
+        <button id="ct-prev-btn" class="btn-secondary" type="button" style="display:none;">← Précédent</button>
+        <button id="ct-next-btn" class="btn" type="button">Suivant →</button>
+        <button id="ct-submit-btn" class="btn" type="button" style="display:none;">Soumettre le test</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // TEST DE LECTURE (etape 8 du plan) — port de content.js
+    // (handleComprehensionTest / displayComprehensionTest / renderMCQQuestions /
+    // renderTestMatchingExercise / submitComprehensionTest / sendScoreToTeacher),
+    // affiche dans un dialogue Apps Script comme les exercices.
+    // Differences assumees avec l'extension :
+    // - le texte analyse depend de l'hote (Code.gs:getReadingTestText) : dans Docs
+    //   c'est le passage SELECTIONNE par l'eleve, dans Slides toute la presentation,
+    //   et dans Sheets le test n'existe pas
+    // - pas de bouton "minimiser" : un dialogue modal Apps Script se ferme et se
+    //   rouvre depuis la sidebar, il n'a pas de bulle flottante ou se replier
+    // - aucun envoi de score : le flux Google Sheet de l'extension est abandonne,
+    //   une vraie base de donnees le remplacera (voir Code.gs, section TEST DE LECTURE)
+    // ============================================================
+
+    const ctLoaderEl = document.getElementById('ct-loader');
+    const ctLoaderTextEl = document.getElementById('ct-loader-text');
+    const ctMainEl = document.getElementById('ct-main');
+    const ctStepIndicatorEl = document.getElementById('ct-step-indicator');
+    const ctPage1El = document.getElementById('ct-page-1');
+    const ctPage2El = document.getElementById('ct-page-2');
+    const ctNavEl = document.getElementById('ct-nav');
+    const ctFooterEl = document.getElementById('ct-footer');
+    const ctPrevBtn = document.getElementById('ct-prev-btn');
+    const ctNextBtn = document.getElementById('ct-next-btn');
+    const ctSubmitBtn = document.getElementById('ct-submit-btn');
+
+    let ctTestData = null;
+    let ctTargetLang = 'en';
+    // Reponses aux QCM, index d'option par question (null = sans reponse, compte comme faux
+    // au moment de la correction, comme dans l'extension).
+    let ctAnswers = [];
+    // Paires formees dans l'appariement : element -> element partenaire (les deux sens).
+    const ctPairMap = new Map();
+
+    document.getElementById('ct-close-x').onclick = () => { google.script.host.close(); };
+
+    function ctEscapeHtml(text) {
+      const div = document.createElement('div');
+      div.textContent = text;
+      return div.innerHTML;
+    }
+
+    function ctShowMessage(html) {
+      ctLoaderEl.innerHTML = '<div class="ct-message">' + html + '</div>'
+        + '<div class="ct-nav"><button class="btn-secondary" type="button" id="ct-msg-close">Fermer</button></div>';
+      document.getElementById('ct-msg-close').onclick = () => { google.script.host.close(); };
+    }
+
+    // ============================================================
+    // Chargement : langue maternelle -> texte du document -> generation du test
+    // ============================================================
+
+    google.script.run
+      .withSuccessHandler((lang) => {
+        ctTargetLang = lang || 'en';
+        ctLoadDocumentText();
+      })
+      .withFailureHandler(() => { ctLoadDocumentText(); })
+      .getNativeLanguage();
+
+    // Le texte a ete lu et valide AVANT l'ouverture de ce dialogue (Code.gs:startReadingTest) :
+    // dans Docs il vient de la selection de l'eleve, qui n'est pas forcement lisible depuis un
+    // dialogue modal. On ne fait donc que le recuperer ici. Un dialogue qui s'ouvre implique
+    // que la verification est deja passee — le cas vide ne devrait pas arriver.
+    function ctLoadDocumentText() {
+      google.script.run
+        .withSuccessHandler((text) => {
+          if (!text) {
+            ctShowMessage('Le texte du test n\'a pas pu être récupéré.<br>Ferme cette fenêtre et relance le test depuis le panneau Daspalecte.');
+            return;
+          }
+          ctLoaderTextEl.textContent = 'Claude prépare ton test de lecture...';
+          ctGenerateTest(text);
+        })
+        .withFailureHandler((err) => {
+          ctShowMessage('Erreur de lecture du document : ' + ctEscapeHtml(err.message));
+        })
+        .consumeReadingTestText();
+    }
+
+    function ctGenerateTest(text) {
+      google.script.run
+        .withSuccessHandler((data) => {
+          if (!data || !data.questions || !data.questions.length) {
+            ctShowMessage('Erreur : ' + ctEscapeHtml((data && data.message) || 'réponse inattendue du serveur.'));
+            return;
+          }
+          ctTestData = data;
+          ctAnswers = new Array(data.questions.length).fill(null);
+          ctDisplayTest(data);
+        })
+        .withFailureHandler((err) => {
+          ctShowMessage('Erreur lors de la préparation du test : ' + ctEscapeHtml(err.message));
+        })
+        .callCloudFunction({ action: 'generate_comprehension_test', text: text, nativeLanguage: ctTargetLang });
+    }
+
+    // ============================================================
+    // Affichage du test
+    // ============================================================
+
+    function ctDisplayTest(data) {
+      ctLoaderEl.style.display = 'none';
+      // 'flex' et non 'block' : #ct-main est la colonne qui pousse le pied de page en bas
+      // de la fenetre (voir sa regle CSS plus haut).
+      ctMainEl.style.display = 'flex';
+
+      ctRenderMCQ(data.questions, document.getElementById('ct-mcq-container'));
+      if (data.matching && data.matching.pairs && data.matching.pairs.length) {
+        ctRenderMatching(data.matching, document.getElementById('ct-matching-container'));
+      }
+
+      ctNextBtn.onclick = () => ctShowPage(2);
+      ctPrevBtn.onclick = () => ctShowPage(1);
+      ctSubmitBtn.onclick = () => ctSubmitTest();
+      ctShowPage(1);
+    }
+
+    function ctShowPage(page) {
+      ctStepIndicatorEl.textContent = page + ' / 2';
+      ctPage1El.style.display = page === 1 ? 'block' : 'none';
+      ctPage2El.style.display = page === 2 ? 'block' : 'none';
+      ctPrevBtn.style.display = page === 2 ? 'inline-block' : 'none';
+      ctNextBtn.style.display = page === 1 ? 'inline-block' : 'none';
+      ctSubmitBtn.style.display = page === 2 ? 'inline-block' : 'none';
+      window.scrollTo(0, 0);
+      // Les lignes de l'appariement se calculent a partir de positions a l'ecran :
+      // elles sont fausses tant que la page 2 est masquee (getBoundingClientRect
+      // renvoie 0 partout), d'ou ce redessin a l'affichage.
+      if (page === 2 && typeof ctRedrawMatchingLines === 'function') ctRedrawMatchingLines();
+    }
+
+    // Enveloppe chaque mot dans un span cliquable (traduction a la demande) — equivalent du
+    // traducteur qui reste actif dans l'overlay du test cote extension. Applique aux enonces
+    // seulement, pas aux options : sur une option, le clic doit cocher la reponse.
+    function ctWrapClickableWords(text) {
+      return ctEscapeHtml(text).replace(/[\p{L}\p{M}'’-]{2,}/gu, (word) => '<span class="ct-word">' + word + '</span>');
+    }
+
+    const ctTranslationCache = new Map();
+
+    function ctAttachWordTranslation(container) {
+      container.querySelectorAll('.ct-word').forEach((wordEl) => {
+        wordEl.addEventListener('click', (e) => {
+          e.stopPropagation();
+          const existing = wordEl.querySelector('.daspalecte-translation-bubble');
+          document.querySelectorAll('.daspalecte-translation-bubble').forEach((b) => b.remove());
+          if (existing) return;
+
+          const word = wordEl.textContent;
+          const show = (translation) => {
+            if (!translation) return;
+            const bubble = document.createElement('span');
+            bubble.className = 'daspalecte-translation-bubble';
+            bubble.textContent = translation;
+            wordEl.appendChild(bubble);
+          };
+          if (ctTranslationCache.has(word)) { show(ctTranslationCache.get(word)); return; }
+          google.script.run
+            .withSuccessHandler((translation) => { ctTranslationCache.set(word, translation); show(translation); })
+            .withFailureHandler(() => { ctTranslationCache.set(word, null); })
+            .translateText(word, 'auto', ctTargetLang);
+        });
+      });
+    }
+
+    document.addEventListener('click', (e) => {
+      if (e.target.closest('.ct-word')) return;
+      document.querySelectorAll('.daspalecte-translation-bubble').forEach((b) => b.remove());
+    });
+
+    function ctRenderMCQ(questions, container) {
+      questions.forEach((q, qIdx) => {
+        const questionDiv = document.createElement('div');
+        questionDiv.className = 'ct-question';
+        questionDiv.dataset.idx = qIdx;
+
+        let optionsHTML = '';
+        q.options.forEach((opt, oIdx) => {
+          optionsHTML += '<label class="ct-option">'
+            + '<input type="radio" name="ct-q-' + qIdx + '" value="' + oIdx + '" class="ct-radio">'
+            + '<span class="ct-option-text">' + ctEscapeHtml(opt) + '</span>'
+            + '</label>';
+        });
+
+        questionDiv.innerHTML =
+          '<div class="ct-question-header">'
+          + '<span class="ct-question-number">' + (qIdx + 1) + '</span>'
+          + '<span class="ct-question-text">' + ctWrapClickableWords(q.question) + '</span>'
+          + '</div>'
+          + '<div class="ct-options">' + optionsHTML + '</div>';
+
+        questionDiv.querySelectorAll('.ct-radio').forEach((radio) => {
+          radio.addEventListener('change', () => { ctAnswers[qIdx] = parseInt(radio.value, 10); });
+        });
+
+        container.appendChild(questionDiv);
+        ctAttachWordTranslation(questionDiv.querySelector('.ct-question-text'));
+      });
+    }
+
+    // Redessin des lignes exposé au niveau du module : ctShowPage en a besoin quand la
+    // page 2 devient visible (voir le commentaire la-bas).
+    let ctRedrawMatchingLines = null;
+
+    function ctRenderMatching(matchingData, container) {
+      let selectedFrEl = null;
+      let selectedTrEl = null;
+      const pairs = matchingData.pairs;
+
+      // Une couleur distincte par paire, comme dans l'extension — palette Classica
+      // (content.js:renderTestMatchingExercise, branche currentTheme === 'classica').
+      const pairColors = ['#2d6a5a', '#d4944c', '#c4862e', '#2d8a4e', '#b44040', '#7a5fa0', '#c4a022', '#1a8a6e'];
+      let colorIndex = 0;
+      const pairColorMap = new Map();
+
+      container.innerHTML =
+        '<div class="ct-matching-wrap">'
+        + '<div class="ct-matching-cols">'
+        + '<div class="ct-matching-col" id="ct-col-fr"></div>'
+        + '<div class="ct-matching-col" id="ct-col-tr"></div>'
+        + '</div>'
+        + '<svg id="ct-matching-svg" style="position:absolute;top:0;left:0;width:100%;height:100%;pointer-events:none;"></svg>'
+        + '</div>';
+
+      const wrap = container.querySelector('.ct-matching-wrap');
+      const colFr = container.querySelector('#ct-col-fr');
+      const colTr = container.querySelector('#ct-col-tr');
+      const svg = container.querySelector('#ct-matching-svg');
+
+      const drawLines = () => {
+        svg.innerHTML = '';
+        const wrapRect = wrap.getBoundingClientRect();
+        const processed = new Set();
+
+        ctPairMap.forEach((partner, el) => {
+          if (processed.has(el)) return;
+          processed.add(el);
+          processed.add(partner);
+
+          const frEl = colFr.contains(el) ? el : partner;
+          const trEl = colFr.contains(el) ? partner : el;
+          const frRect = frEl.getBoundingClientRect();
+          const trRect = trEl.getBoundingClientRect();
+
+          // Chaine construite en 3 morceaux : Apps Script supprime tout ce qui suit "//"
+          // dans le script servi, meme a l'interieur d'une chaine (voir INIT.md, pieges
+          // Apps Script n°1) — 'http://www.w3.org/2000/svg' serait tronque en 'http:'.
+          const svgNs = 'http:' + '/' + '/www.w3.org/2000/svg';
+          const line = document.createElementNS(svgNs, 'line');
+          line.setAttribute('x1', frRect.right - wrapRect.left);
+          line.setAttribute('y1', frRect.top + frRect.height / 2 - wrapRect.top);
+          line.setAttribute('x2', trRect.left - wrapRect.left);
+          line.setAttribute('y2', trRect.top + trRect.height / 2 - wrapRect.top);
+          line.setAttribute('stroke', pairColorMap.get(frEl) || '#2d6a5a');
+          line.setAttribute('stroke-width', '2');
+          line.setAttribute('opacity', '0.8');
+          svg.appendChild(line);
+        });
+      };
+      ctRedrawMatchingLines = drawLines;
+
+      const applyPairStyle = (el, color) => {
+        el.style.borderColor = color;
+        el.style.color = color;
+        el.style.background = color + '15';
+        el.classList.add('ct-paired');
+      };
+
+      const clearPairStyle = (el) => {
+        el.style.borderColor = '';
+        el.style.color = '';
+        el.style.background = '';
+        el.classList.remove('ct-paired');
+        pairColorMap.delete(el);
+      };
+
+      const tryFormPair = () => {
+        if (!selectedFrEl || !selectedTrEl) return;
+        const color = pairColors[colorIndex % pairColors.length];
+        colorIndex++;
+        selectedFrEl.classList.remove('selected');
+        selectedTrEl.classList.remove('selected');
+        applyPairStyle(selectedFrEl, color);
+        applyPairStyle(selectedTrEl, color);
+        pairColorMap.set(selectedFrEl, color);
+        pairColorMap.set(selectedTrEl, color);
+        ctPairMap.set(selectedFrEl, selectedTrEl);
+        ctPairMap.set(selectedTrEl, selectedFrEl);
+        selectedFrEl = null;
+        selectedTrEl = null;
+        drawLines();
+      };
+
+      // Reclic sur un element deja apparie : on defait la paire (aucune correction n'est
+      // affichee avant la soumission, l'eleve peut donc se corriger librement).
+      const unpair = (el) => {
+        const partner = ctPairMap.get(el);
+        if (!partner) return;
+        clearPairStyle(el);
+        clearPairStyle(partner);
+        ctPairMap.delete(el);
+        ctPairMap.delete(partner);
+        drawLines();
+      };
+
+      const buildItem = (label, value, isFrench) => {
+        const el = document.createElement('div');
+        el.className = 'ct-match-item';
+        el.textContent = label;
+        el.dataset.val = value;
+        el.tabIndex = 0;
+        el.setAttribute('role', 'button');
+        el.setAttribute('aria-label', label);
+        const handleSelect = () => {
+          if (el.classList.contains('ct-paired')) { unpair(el); return; }
+          if (isFrench) {
+            if (selectedFrEl) selectedFrEl.classList.remove('selected');
+            selectedFrEl = el;
+          } else {
+            if (selectedTrEl) selectedTrEl.classList.remove('selected');
+            selectedTrEl = el;
+          }
+          el.classList.add('selected');
+          tryFormPair();
+        };
+        el.onclick = handleSelect;
+        el.addEventListener('keydown', (e) => {
+          if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); handleSelect(); }
+        });
+        return el;
+      };
+
+      [...pairs].sort(() => Math.random() - 0.5).forEach((pair) => {
+        colFr.appendChild(buildItem(pair.fr, pair.fr, true));
+      });
+      [...pairs].sort(() => Math.random() - 0.5).forEach((pair) => {
+        colTr.appendChild(buildItem(pair.tr, pair.fr, false));
+      });
+
+      window.addEventListener('resize', drawLines);
+    }
+
+    // ============================================================
+    // Correction + envoi du score
+    // ============================================================
+
+    function ctSubmitTest() {
+      const data = ctTestData;
+
+      let mcqCorrect = 0;
+      const mcqTotal = data.questions.length;
+      data.questions.forEach((q, idx) => {
+        if (ctAnswers[idx] === q.correct) mcqCorrect++;
+      });
+
+      const totalPairs = data.matching && data.matching.pairs ? data.matching.pairs.length : 0;
+      let matchingCorrect = 0;
+      const colFr = document.getElementById('ct-col-fr');
+      const processed = new Set();
+
+      ctPairMap.forEach((partner, el) => {
+        if (processed.has(el) || !colFr) return;
+        processed.add(el);
+        processed.add(partner);
+
+        const frEl = colFr.contains(el) ? el : partner;
+        const trEl = colFr.contains(el) ? partner : el;
+        const ok = frEl.dataset.val === trEl.dataset.val;
+        [frEl, trEl].forEach((item) => {
+          // La couleur de paire posee en style inline masquerait le vert/rouge de la
+          // correction : on la retire avant d'appliquer la classe de resultat.
+          item.style.borderColor = '';
+          item.style.color = '';
+          item.style.background = '';
+          item.classList.add(ok ? 'ct-correct' : 'ct-incorrect');
+        });
+        if (ok) matchingCorrect++;
+      });
+
+      // Les mots laisses sans paire comptent comme faux, comme dans l'extension.
+      document.querySelectorAll('#ct-col-fr .ct-match-item, #ct-col-tr .ct-match-item').forEach((el) => {
+        if (!el.classList.contains('ct-correct') && !el.classList.contains('ct-incorrect')) {
+          el.classList.add('ct-incorrect');
+        }
+      });
+
+      const totalScore = mcqCorrect + matchingCorrect;
+      const totalMax = mcqTotal + totalPairs;
+      const percentage = totalMax > 0 ? Math.round((totalScore / totalMax) * 100) : 0;
+
+      // Feedback QCM : bonne reponse en vert, reponse erronee de l'eleve en rouge.
+      data.questions.forEach((q, idx) => {
+        const questionDiv = document.querySelector('.ct-question[data-idx="' + idx + '"]');
+        if (!questionDiv) return;
+        questionDiv.querySelectorAll('.ct-option').forEach((opt, oIdx) => {
+          if (oIdx === q.correct) opt.classList.add('ct-correct');
+          else if (oIdx === ctAnswers[idx]) opt.classList.add('ct-incorrect');
+        });
+        questionDiv.querySelectorAll('.ct-radio').forEach((r) => { r.disabled = true; });
+      });
+
+      // Les deux pages restent affichees ensemble pour la relecture des resultats.
+      ctPage1El.style.display = 'block';
+      ctPage2El.style.display = 'block';
+      ctStepIndicatorEl.textContent = 'Résultats';
+      ctNavEl.style.display = 'none';
+
+      const scoreClass = percentage >= 70 ? 'ct-score-good' : percentage >= 50 ? 'ct-score-ok' : 'ct-score-bad';
+      const resultsDiv = document.createElement('div');
+      resultsDiv.className = 'ct-results';
+      resultsDiv.innerHTML =
+        '<div class="ct-score-display">'
+        + '<div class="ct-score-circle ' + scoreClass + '"><span class="ct-score-number">' + percentage + '%</span></div>'
+        + '<div class="ct-score-details">'
+        + '<p>QCM : ' + mcqCorrect + ' / ' + mcqTotal + '</p>'
+        + '<p>Appariement : ' + matchingCorrect + ' / ' + totalPairs + '</p>'
+        + '<p class="ct-score-total">Total : ' + totalScore + ' / ' + totalMax + '</p>'
+        + '</div></div>'
+        + '<button class="btn" type="button" id="ct-close-results">Fermer le test</button>';
+      ctFooterEl.appendChild(resultsDiv);
+      document.getElementById('ct-close-results').onclick = () => { google.script.host.close(); };
+      window.scrollTo(0, 0);
+      // Le score n'est envoye nulle part : le flux Google Sheet de l'extension est abandonne,
+      // une vraie base de donnees le remplacera (voir Code.gs, section TEST DE LECTURE).
+    }
+  </script>
+</body>
+</html>

@@ -1,0 +1,949 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <base target="_top">
+  <meta charset="utf-8">
+  <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;700;900&family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    /* Valeurs reprises telles quelles de themes.css (bloc Classica, themes.css:127-226) et de
+       sidepanel.css — cette sidebar ne charge pas ces fichiers, donc dupliquees ici. Reprend
+       aussi les classes/l'ordre des sections de sidepanel.html/.css (retour utilisateur direct :
+       la sidebar de l'add-on doit ressembler a celle de l'extension autant que possible). */
+    :root {
+      --t-primary: #2d6a5a;
+      --t-accent: #d4944c;
+      --t-bg: #faf6f0;
+      --t-bg-card: #ffffff;
+      --t-bg-element: #f0ebe3;
+      --t-text: #3d3832;
+      --t-text-secondary: #5a534b;
+      --t-text-muted: #6b6259;
+      --t-text-dim: #766c61;
+      --t-text-on-primary: #ffffff;
+      --t-text-on-accent: #2e1c0a;
+      --t-border: #d5cec4;
+      --t-border-strong: #b5ad9f;
+      --t-danger: #b44040;
+      --t-success: #2d8a4e;
+
+      --t-font-title: 'Playfair Display', Georgia, serif;
+      --t-font-body: 'Inter', -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
+      --t-title-spacing: 1px;
+
+      --t-glass-bg: rgba(45, 106, 90, 0.04);
+      --t-glass-bg-hover: rgba(45, 106, 90, 0.08);
+
+      --t-primary-a05: rgba(45, 106, 90, 0.05);
+      --t-primary-a08: rgba(45, 106, 90, 0.08);
+      --t-primary-a10: rgba(45, 106, 90, 0.10);
+      --t-primary-a15: rgba(45, 106, 90, 0.15);
+      --t-primary-a20: rgba(45, 106, 90, 0.20);
+      --t-primary-a30: rgba(45, 106, 90, 0.30);
+      --t-primary-a40: rgba(45, 106, 90, 0.40);
+      --t-primary-a50: rgba(45, 106, 90, 0.50);
+      --t-accent-a10: rgba(212, 148, 76, 0.10);
+      --t-accent-a15: rgba(212, 148, 76, 0.15);
+      --t-accent-a20: rgba(212, 148, 76, 0.20);
+      --t-accent-a40: rgba(212, 148, 76, 0.40);
+
+      /* Ombre douce uniforme — charte Classica : jamais de glow colore/neon,
+         voir skill design-classica ("Ombres douces... jamais de glow neon"). */
+      --t-shadow-soft: 0 2px 8px rgba(0, 0, 0, 0.08);
+
+      --t-gradient-panel: linear-gradient(180deg, rgba(45, 106, 90, 0.02), rgba(212, 148, 76, 0.02));
+      --t-gradient-btn: linear-gradient(90deg, #2d6a5a, #357a68);
+      --t-gradient-btn-accent: linear-gradient(90deg, #d4944c, #c4862e);
+
+      --t-radius-sm: 4px;
+      --t-radius: 4px;
+      --t-radius-lg: 8px;
+
+      --t-select-bg: #f0ebe3;
+      --t-scrollbar-track: rgba(0, 0, 0, 0.02);
+
+      --t-btn-primary-bg: var(--t-gradient-btn);
+      --t-btn-primary-text: #ffffff;
+      --t-btn-secondary-bg: var(--t-gradient-btn-accent);
+      --t-btn-secondary-text: #ffffff;
+
+      --t-translation-bg: #2d6a5a;
+      --t-translation-text: #ffffff;
+    }
+
+    body {
+      margin: 0;
+      padding: 20px;
+      background: var(--t-bg);
+      color: var(--t-text-secondary);
+      font-family: var(--t-font-body);
+      box-sizing: border-box;
+    }
+
+    /* En-tete — pas de titre "Daspalecte" ici : la sidebar Apps Script affiche deja le sien
+       dans sa propre barre native, un second titre juste en dessous faisait doublon (retour
+       utilisateur). La place est donc rendue au reglage de langue maternelle, qui vit dans le
+       popup de l'extension — popup absent d'un add-on Docs/Sheets/Slides. */
+    header {
+      margin-bottom: 20px;
+      border-bottom: 1px solid var(--t-border);
+      padding-bottom: 12px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .lang-label {
+      display: flex;
+      align-items: center;
+      gap: 5px;
+      font-size: 0.8rem;
+      color: var(--t-accent);
+      opacity: 0.9;
+      flex-shrink: 0;
+      white-space: nowrap;
+    }
+
+    /* Repli quand la sidebar est trop etroite pour le libelle : seule l'icone reste
+       (le <select> garde alors toute la largeur utile). */
+    @media (max-width: 270px) {
+      .lang-label .lang-label-text {
+        display: none;
+      }
+    }
+
+    .lang-select {
+      flex: 1;
+      min-width: 0;
+      background: var(--t-select-bg);
+      border: 1px solid var(--t-border);
+      color: var(--t-text);
+      padding: 8px;
+      border-radius: var(--t-radius-sm);
+      font-size: 0.85rem;
+      font-family: var(--t-font-body);
+      outline: none;
+      box-sizing: border-box;
+    }
+
+    /* Cartes de section — equivalent de sidepanel.css:72-98 (.tool-section/.section-header) */
+    .tool-section {
+      background: var(--t-glass-bg);
+      border: 1px solid var(--t-border);
+      border-radius: var(--t-radius-lg);
+      margin-bottom: 16px;
+      padding: 16px;
+    }
+
+    .section-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 12px;
+      /* Bloc de reference des bulles d'info : ancrees a la LARGEUR DE LA CARTE et non a
+         l'icone, sinon une bulle de largeur fixe deborde de la sidebar (etroite) des que
+         l'icone se trouve un peu a droite. Le z-index maintient l'en-tete (donc la bulle)
+         au-dessus du bouton d'action de la section, qui le suit dans le flux. */
+      position: relative;
+      z-index: 2;
+    }
+
+    .section-header-title {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      min-width: 0;
+    }
+
+    .section-header-actions {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      flex-shrink: 0;
+    }
+
+    .tool-section h2 {
+      font-family: var(--t-font-title);
+      font-size: 0.9rem;
+      margin: 0;
+      color: var(--t-primary);
+      opacity: 0.9;
+    }
+
+    .section-content {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+
+    /* Interrupteurs — equivalent de sidepanel.css:129-176 (.switch/.slider), sans le glow
+       (charte Classica). Dans l'extension ils activent l'ecoute des clics sur la page ; ici
+       le modele est "selectionner puis cliquer", donc ils activent/desactivent le bouton
+       d'action de la section (et son etat est persiste comme dans l'extension). */
+    .switch {
+      position: relative;
+      display: inline-block;
+      width: 40px;
+      height: 20px;
+      flex-shrink: 0;
+    }
+
+    .switch input {
+      opacity: 0;
+      width: 0;
+      height: 0;
+    }
+
+    .slider {
+      position: absolute;
+      cursor: pointer;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background-color: var(--t-border-strong);
+      transition: .4s;
+      border-radius: 20px;
+    }
+
+    .slider:before {
+      position: absolute;
+      content: "";
+      height: 14px;
+      width: 14px;
+      left: 3px;
+      bottom: 3px;
+      background-color: #fff;
+      transition: .4s;
+      border-radius: 50%;
+    }
+
+    .switch input:checked + .slider {
+      background-color: var(--t-primary);
+    }
+
+    .switch input:checked + .slider:before {
+      transform: translateX(20px);
+    }
+
+    .switch input:focus-visible + .slider {
+      outline: 2px solid var(--t-accent);
+      outline-offset: 2px;
+    }
+
+    /* Bulle d'info au survol — remplace le paragraphe de consigne, qui prenait une place
+       importante dans une sidebar deja etroite. Egalement declenchee au focus clavier. */
+    .info-tip {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 16px;
+      height: 16px;
+      flex-shrink: 0;
+      border: 1px solid var(--t-primary-a40);
+      border-radius: 50%;
+      background: none;
+      color: var(--t-text-muted);
+      font-family: var(--t-font-title);
+      font-size: 0.65rem;
+      font-weight: 700;
+      line-height: 1;
+      cursor: help;
+      padding: 0;
+      transition: color 0.2s ease, border-color 0.2s ease;
+    }
+
+    /* Pas d'`opacity` sur .info-tip pour l'attenuer : elle creerait un contexte
+       d'empilement, et la bulle absolue resterait alors coincee SOUS le bouton
+       d'action de la section (constate en test). Attenuation par la couleur. */
+    .info-tip:hover,
+    .info-tip:focus-visible {
+      border-color: var(--t-primary);
+      color: var(--t-primary);
+    }
+
+    .info-tip .info-bubble {
+      position: absolute;
+      top: calc(100% + 6px);
+      left: 0;
+      right: 0;
+      background: var(--t-bg-card);
+      border: 1px solid var(--t-border);
+      border-radius: var(--t-radius-sm);
+      box-shadow: var(--t-shadow-soft);
+      color: var(--t-text-secondary);
+      font-family: var(--t-font-body);
+      font-size: 0.72rem;
+      font-weight: 400;
+      line-height: 1.45;
+      text-align: left;
+      padding: 8px 10px;
+      opacity: 0;
+      visibility: hidden;
+      transition: opacity 0.15s ease, visibility 0.15s ease;
+      z-index: 10;
+    }
+
+    .info-tip:hover .info-bubble,
+    .info-tip:focus-visible .info-bubble {
+      opacity: 1;
+      visibility: visible;
+    }
+
+    /* Boutons d'action — equivalent de sidepanel.css:384-401 (.action-btn) */
+    .action-btn {
+      background: var(--t-btn-primary-bg);
+      border: none;
+      color: var(--t-btn-primary-text);
+      padding: 10px;
+      border-radius: var(--t-radius-sm);
+      font-family: var(--t-font-title);
+      font-weight: bold;
+      font-size: 0.75rem;
+      letter-spacing: 0.3px;
+      cursor: pointer;
+      transition: all 0.2s ease;
+    }
+
+    .action-btn:hover {
+      filter: brightness(1.06);
+      box-shadow: var(--t-shadow-soft);
+    }
+
+    .action-btn:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+      filter: none;
+      box-shadow: none;
+    }
+
+    .action-btn.secondary {
+      background: var(--t-btn-secondary-bg);
+    }
+
+    .result-box {
+      background: var(--t-bg-card);
+      border: 1px solid var(--t-border);
+      border-radius: var(--t-radius-sm);
+      padding: 10px 12px;
+      font-size: 0.8rem;
+      line-height: 1.5;
+    }
+
+    .result-word {
+      font-weight: 700;
+      color: var(--t-primary);
+    }
+
+    .comprehension-label {
+      font-weight: 700;
+      color: var(--t-accent);
+      font-size: 0.68rem;
+      text-transform: uppercase;
+      letter-spacing: 0.4px;
+      margin-bottom: 3px;
+    }
+
+    /* Liste de vocabulaire — equivalent de sidepanel.css:193-296 (.word-list-container/.word-item).
+       Elle vit DANS la carte "Vocabulaire", sous le bouton de traduction (et non dans une carte
+       "Mots" separee comme au depart) : c'est la meme carte qui produit les mots et qui les
+       affiche. Sous-en-tete pour la separer visuellement du bloc de traduction. */
+    .subsection {
+      border-top: 1px solid var(--t-border);
+      padding-top: 12px;
+      margin-top: 2px;
+    }
+
+    .subsection-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 8px;
+    }
+
+    .subsection-header h3 {
+      font-family: var(--t-font-title);
+      font-size: 0.82rem;
+      margin: 0;
+      color: var(--t-primary);
+      opacity: 0.9;
+    }
+
+    /* Lien "Tout cocher" — equivalent de sidepanel.css:367-382 (.text-link) */
+    .text-link {
+      background: none;
+      border: none;
+      color: var(--t-primary);
+      font-size: 0.72rem;
+      font-family: var(--t-font-body);
+      cursor: pointer;
+      opacity: 0.7;
+      transition: opacity 0.2s;
+      padding: 0;
+    }
+
+    .text-link:hover {
+      opacity: 1;
+      text-decoration: underline;
+    }
+
+    /* Corbeille de suppression groupee — equivalent de sidepanel.css (.header-icon-btn),
+       masquee tant qu'aucun mot n'est coche. */
+    .header-icon-btn {
+      background: none;
+      border: none;
+      cursor: pointer;
+      font-size: 0.9rem;
+      padding: 2px 4px;
+      border-radius: var(--t-radius-sm);
+      transition: all 0.2s ease;
+      opacity: 0.8;
+    }
+
+    .header-icon-btn:hover {
+      background: var(--t-accent-a15);
+      opacity: 1;
+    }
+
+    .header-icon-btn.hidden {
+      display: none;
+    }
+
+    .word-list-container {
+      min-height: 60px;
+      max-height: 260px;
+      overflow-y: auto;
+      border: 1px solid var(--t-glass-bg);
+      background: var(--t-scrollbar-track);
+      border-radius: var(--t-radius-sm);
+      padding: 8px;
+    }
+
+    .empty-msg {
+      font-size: 0.78rem;
+      opacity: 0.5;
+      text-align: center;
+      margin: 14px 0;
+      font-style: italic;
+    }
+
+    .word-item {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      background: var(--t-glass-bg);
+      border: 1px solid var(--t-accent-a20);
+      padding: 7px 10px;
+      border-radius: var(--t-radius-sm);
+      margin-bottom: 6px;
+      font-size: 0.8rem;
+      transition: background 0.2s ease, border-color 0.2s ease;
+    }
+
+    .word-item:last-child {
+      margin-bottom: 0;
+    }
+
+    .word-item:hover {
+      background: var(--t-glass-bg-hover);
+      border-color: var(--t-accent-a40);
+    }
+
+    /* Case a cocher — equivalent de sidepanel.css:226-260 (.word-checkbox), sans le glow.
+       Ce sont les mots COCHES qui alimentent la generation d'exercices (comme dans
+       l'extension), pas la liste entiere. */
+    .word-checkbox {
+      appearance: none;
+      -webkit-appearance: none;
+      width: 16px;
+      height: 16px;
+      border: 2px solid var(--t-text-dim);
+      border-radius: var(--t-radius-sm);
+      cursor: pointer;
+      position: relative;
+      background: var(--t-bg-card);
+      flex-shrink: 0;
+      transition: all 0.2s ease;
+      margin: 0;
+    }
+
+    .word-checkbox:hover {
+      border-color: var(--t-primary);
+    }
+
+    .word-checkbox:checked {
+      border-color: var(--t-primary);
+      background: var(--t-primary-a15);
+    }
+
+    .word-checkbox:checked::after {
+      content: "\2713";
+      position: absolute;
+      color: var(--t-primary);
+      font-size: 11px;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+    }
+
+    .word-content {
+      flex: 1;
+      min-width: 0;
+    }
+
+    .word-translation {
+      opacity: 0.65;
+      font-style: italic;
+    }
+
+    .word-remove-btn {
+      background: none;
+      border: none;
+      color: var(--t-danger);
+      cursor: pointer;
+      font-size: 13px;
+      padding: 2px 4px;
+      flex-shrink: 0;
+    }
+
+    /* Barre d'actions sous la liste — equivalent de sidepanel.css:298-316 (.actions-bar),
+       masquee tant qu'il n'y a aucun mot (comme le bouton "Generer des exercices" de
+       l'extension, qui n'apparait que si des mots ont ete selectionnes). */
+    .actions-bar {
+      display: none;
+      margin-top: 14px;
+    }
+
+    .actions-bar .action-btn {
+      width: 100%;
+    }
+
+    /* Pied de page — equivalent de sidepanel.css:428-458 (.branding-footer + .branding-logo).
+       Le logo est inline en data: URI : un add-on Apps Script n'expose aucun fichier statique,
+       il n'y a donc pas d'URL a mettre dans src (l'extension, elle, sert logo-pedagokit.png
+       depuis son propre paquet). Le fichier source est logo-pedagokit.png a la racine du repo,
+       redimensionne a 200px de large avant encodage. */
+    .branding-footer {
+      margin-top: 24px;
+      padding-top: 14px;
+      border-top: 1px solid var(--t-border);
+      display: flex;
+      flex-direction: row;
+      justify-content: center;
+      align-items: center;
+      gap: 14px;
+      flex-wrap: wrap;
+    }
+
+    .branding-footer p {
+      margin: 0;
+      font-size: 0.75rem;
+      color: var(--t-primary);
+      opacity: 0.75;
+      font-family: var(--t-font-title);
+      letter-spacing: 1px;
+      white-space: nowrap;
+    }
+
+    .branding-logo {
+      height: 45px;
+      width: auto;
+      filter: drop-shadow(0 2px 6px rgba(61, 56, 50, 0.18));
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <label class="lang-label" for="lang-select">
+      <span aria-hidden="true">🌐</span>
+      <span class="lang-label-text">Ma langue</span>
+    </label>
+    <select id="lang-select" class="lang-select">
+      <option value="ar">Arabe</option>
+      <option value="en">Anglais</option>
+      <option value="fa">Dari</option>
+      <option value="es">Espagnol</option>
+      <option value="ku">Kurde</option>
+      <option value="ps">Pashto</option>
+      <option value="pl">Polonais</option>
+      <option value="ro">Roumain</option>
+      <option value="ru">Russe</option>
+      <option value="tr">Turc</option>
+      <option value="uk">Ukrainien</option>
+    </select>
+  </header>
+
+  <!-- Vocabulaire : la traduction de la selection ET la liste des mots obtenus vivent dans la
+       meme carte, comme dans le sidepanel de l'extension ou ces deux blocs se suivent. -->
+  <section class="tool-section">
+    <div class="section-header">
+      <div class="section-header-title">
+        <h2>Vocabulaire</h2>
+        <span class="info-tip" tabindex="0" role="note"
+              aria-label="Sélectionne un mot ou une courte expression dans le document, puis clique">
+          i
+          <span class="info-bubble">Sélectionne un mot ou une courte expression dans le document, puis clique</span>
+        </span>
+      </div>
+      <label class="switch">
+        <input type="checkbox" id="translator-toggle" aria-label="Activer le traducteur">
+        <span class="slider"></span>
+      </label>
+    </div>
+    <div class="section-content">
+      <button id="translate-btn" class="action-btn" type="button" disabled>Traduire la sélection</button>
+      <div id="translate-result" class="result-box" style="display:none;"></div>
+
+      <div class="subsection">
+        <div class="subsection-header">
+          <h3>Mots (<span id="vocab-count">0</span>)</h3>
+          <div class="section-header-actions">
+            <button id="delete-selected" class="header-icon-btn hidden" type="button"
+                    title="Supprimer la sélection" aria-label="Supprimer les mots cochés">🗑️</button>
+            <button id="select-all" class="text-link" type="button">Tout cocher</button>
+          </div>
+        </div>
+        <div id="word-list" class="word-list-container">
+          <p class="empty-msg">Aucun mot pour le moment.</p>
+        </div>
+        <div class="actions-bar" id="words-actions">
+          <button id="generate-ex-btn" class="action-btn secondary" type="button">Générer des exercices</button>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="tool-section">
+    <div class="section-header">
+      <div class="section-header-title">
+        <h2>Compréhension</h2>
+        <span class="info-tip" tabindex="0" role="note"
+              aria-label="Sélectionne un paragraphe, puis clique pour un résumé et une reformulation simplifiée">
+          i
+          <span class="info-bubble">Sélectionne un paragraphe, puis clique pour un résumé et une reformulation simplifiée.</span>
+        </span>
+      </div>
+      <label class="switch">
+        <input type="checkbox" id="comprehension-toggle" aria-label="Activer l'aide à la compréhension">
+        <span class="slider"></span>
+      </label>
+    </div>
+    <div class="section-content">
+      <button id="comprehension-btn" class="action-btn" type="button" disabled>Expliquer la sélection</button>
+      <div id="comprehension-result" class="result-box" style="display:none;"></div>
+    </div>
+  </section>
+
+  <!-- Masquee dans Sheets (un tableau n'est pas un texte suivi) : voir le script en bas
+       de page, la section n'est revelee qu'une fois l'hote connu. -->
+  <section class="tool-section" id="reading-test-section" style="display:none;">
+    <div class="section-header">
+      <h2>Test de lecture</h2>
+    </div>
+    <div class="section-content">
+      <button id="reading-test-btn" class="action-btn" type="button">Passer le test</button>
+      <div id="reading-test-result" class="result-box" style="display:none;"></div>
+    </div>
+  </section>
+
+  <footer class="branding-footer">
+    <p>2026 - version 2.0</p>
+    <img class="branding-logo" alt="Logo PedagokIT" src="data:image/png;base64,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">
+  </footer>
+
+  <script>
+    const langSelect = document.getElementById('lang-select');
+    const translateBtn = document.getElementById('translate-btn');
+    const resultBox = document.getElementById('translate-result');
+    const vocabListEl = document.getElementById('word-list');
+    const vocabCountEl = document.getElementById('vocab-count');
+    const wordsActionsEl = document.getElementById('words-actions');
+    const selectAllBtn = document.getElementById('select-all');
+    const deleteSelectedBtn = document.getElementById('delete-selected');
+    const translatorToggle = document.getElementById('translator-toggle');
+    const comprehensionToggle = document.getElementById('comprehension-toggle');
+
+    // Langue maternelle : chargée au démarrage, sauvegardée à chaque changement.
+    google.script.run.withSuccessHandler((lang) => { langSelect.value = lang; }).getNativeLanguage();
+    langSelect.onchange = () => {
+      google.script.run.setNativeLanguage(langSelect.value);
+    };
+
+    /*
+      Interrupteurs des sections. L'extension les utilise pour brancher/debrancher l'ecoute
+      des clics dans la page ; ici, ou l'eleve selectionne puis clique un bouton, ils
+      activent/desactivent ce bouton. Etat persiste cote serveur (UserProperties), comme
+      chrome.storage.local.translatorEnabled dans l'extension — et desactive par defaut,
+      comme elle.
+    */
+    function applyToggleState(toggle, button) {
+      button.disabled = !toggle.checked;
+      button.title = toggle.checked ? '' : 'Active cet outil avec l\'interrupteur ci-dessus.';
+    }
+
+    translatorToggle.onchange = () => {
+      applyToggleState(translatorToggle, translateBtn);
+      google.script.run.setToolEnabled('translator', translatorToggle.checked);
+    };
+
+    comprehensionToggle.onchange = () => {
+      applyToggleState(comprehensionToggle, comprehensionBtn);
+      google.script.run.setToolEnabled('comprehension', comprehensionToggle.checked);
+    };
+
+    google.script.run
+      .withSuccessHandler((states) => {
+        translatorToggle.checked = !!(states && states.translator);
+        comprehensionToggle.checked = !!(states && states.comprehension);
+        applyToggleState(translatorToggle, translateBtn);
+        applyToggleState(comprehensionToggle, comprehensionBtn);
+      })
+      .getToolStates();
+
+    /*
+      Selection des mots : ce sont les mots COCHES qui alimentent la generation d'exercices,
+      exactement comme dans le sidepanel de l'extension (sidepanel.js:gen-exercises).
+    */
+    function selectedWordItems() {
+      return Array.from(vocabListEl.querySelectorAll('.word-item'))
+        .filter((item) => item.querySelector('.word-checkbox').checked);
+    }
+
+    function updateActionsBarVisibility() {
+      const total = vocabListEl.querySelectorAll('.word-item').length;
+      const checked = selectedWordItems().length;
+
+      wordsActionsEl.style.display = total ? 'block' : 'none';
+      deleteSelectedBtn.classList.toggle('hidden', checked === 0);
+      selectAllBtn.style.display = total ? 'inline' : 'none';
+      selectAllBtn.textContent = (total && checked === total) ? 'Tout décocher' : 'Tout cocher';
+    }
+
+    function renderVocabulary(list) {
+      vocabCountEl.textContent = list.length;
+      vocabListEl.innerHTML = '';
+      if (!list.length) {
+        const empty = document.createElement('p');
+        empty.className = 'empty-msg';
+        empty.textContent = 'Aucun mot pour le moment.';
+        vocabListEl.appendChild(empty);
+        updateActionsBarVisibility();
+        return;
+      }
+      list.forEach((item) => {
+        const li = document.createElement('div');
+        li.className = 'word-item';
+        li.dataset.word = item.word;
+
+        const checkbox = document.createElement('input');
+        checkbox.type = 'checkbox';
+        checkbox.className = 'word-checkbox';
+        checkbox.setAttribute('aria-label', 'Sélectionner ' + item.word);
+        checkbox.onchange = updateActionsBarVisibility;
+
+        const span = document.createElement('span');
+        span.className = 'word-content';
+        span.innerHTML = item.word + ' <span class="word-translation">→ ' + item.translation + '</span>';
+
+        const removeBtn = document.createElement('button');
+        removeBtn.className = 'word-remove-btn';
+        removeBtn.type = 'button';
+        removeBtn.textContent = '✕';
+        removeBtn.setAttribute('aria-label', 'Retirer ' + item.word);
+        removeBtn.onclick = () => {
+          google.script.run.withSuccessHandler(renderVocabulary).removeVocabularyWord(item.word);
+        };
+
+        li.appendChild(checkbox);
+        li.appendChild(span);
+        li.appendChild(removeBtn);
+        vocabListEl.appendChild(li);
+      });
+      updateActionsBarVisibility();
+    }
+
+    google.script.run.withSuccessHandler(renderVocabulary).getVocabulary();
+
+    selectAllBtn.onclick = () => {
+      const boxes = Array.from(vocabListEl.querySelectorAll('.word-checkbox'));
+      const allChecked = boxes.length > 0 && boxes.every((cb) => cb.checked);
+      boxes.forEach((cb) => { cb.checked = !allChecked; });
+      updateActionsBarVisibility();
+    };
+
+    deleteSelectedBtn.onclick = () => {
+      const words = selectedWordItems().map((item) => item.dataset.word);
+      if (!words.length) return;
+      google.script.run.withSuccessHandler(renderVocabulary).removeVocabularyWords(words);
+    };
+
+    translateBtn.onclick = () => {
+      resultBox.style.display = 'block';
+      resultBox.textContent = 'Lecture de la sélection...';
+      translateBtn.disabled = true;
+
+      google.script.run
+        .withSuccessHandler((selectedText) => {
+          if (!selectedText) {
+            resultBox.textContent = 'Aucune sélection détectée dans le document.';
+            translateBtn.disabled = false;
+            return;
+          }
+          // Traduction limitée à un mot ou une courte expression : pas de passage entier
+          // (l'aide à la compréhension, sur des paragraphes, sera une fonction séparée).
+          const wordCount = selectedText.trim().split(/\s+/).filter(Boolean).length;
+          if (wordCount > 3) {
+            resultBox.textContent = 'Sélectionne au maximum 3 mots pour la traduction (' + wordCount + ' sélectionnés).';
+            translateBtn.disabled = false;
+            return;
+          }
+          resultBox.textContent = 'Traduction en cours...';
+
+          google.script.run
+            .withSuccessHandler((translation) => {
+              resultBox.innerHTML = '<span class="result-word">' + selectedText + '</span> → ' + translation;
+
+              // Ajout automatique au vocabulaire dès la traduction reçue (comme l'extension
+              // Chrome — pas de bouton "Ajouter" séparé).
+              google.script.run.withSuccessHandler(renderVocabulary).addVocabularyWord(selectedText, translation);
+              translateBtn.disabled = false;
+            })
+            .withFailureHandler((err) => {
+              resultBox.textContent = 'Erreur de traduction : ' + err.message;
+              translateBtn.disabled = false;
+            })
+            .translateText(selectedText, 'auto', langSelect.value);
+        })
+        .withFailureHandler((err) => {
+          resultBox.textContent = 'Erreur de lecture de la sélection : ' + err.message;
+          translateBtn.disabled = false;
+        })
+        .getSelectionText();
+    };
+
+    const comprehensionBtn = document.getElementById('comprehension-btn');
+    const comprehensionResult = document.getElementById('comprehension-result');
+
+    comprehensionBtn.onclick = () => {
+      comprehensionResult.style.display = 'block';
+      comprehensionResult.textContent = 'Lecture de la sélection...';
+      comprehensionBtn.disabled = true;
+
+      google.script.run
+        .withSuccessHandler((selectedText) => {
+          if (!selectedText) {
+            comprehensionResult.textContent = 'Aucune sélection détectée dans le document.';
+            comprehensionBtn.disabled = false;
+            return;
+          }
+          if (selectedText.trim().length < 20) {
+            comprehensionResult.textContent = 'Sélectionne un passage plus long (au moins une phrase) — pour un mot seul, utilise "Traduire" ci-dessus.';
+            comprehensionBtn.disabled = false;
+            return;
+          }
+          comprehensionResult.textContent = 'Claude prépare le résumé...';
+
+          google.script.run
+            .withSuccessHandler((result) => {
+              if (!result || !result.summary) {
+                comprehensionResult.textContent = 'Erreur : ' + (result && result.message ? result.message : 'réponse inattendue du serveur.');
+                comprehensionBtn.disabled = false;
+                return;
+              }
+              comprehensionResult.innerHTML =
+                '<div class="comprehension-label">Résumé</div>' +
+                '<div>' + result.summary + '</div>' +
+                '<div class="comprehension-label" style="margin-top:10px;">Reformulation simplifiée</div>' +
+                '<div>' + result.reformulation + '</div>';
+              comprehensionBtn.disabled = false;
+            })
+            .withFailureHandler((err) => {
+              comprehensionResult.textContent = 'Erreur : ' + err.message;
+              comprehensionBtn.disabled = false;
+            })
+            .callCloudFunction({ action: 'summarize', text: selectedText, nativeLanguage: langSelect.value });
+        })
+        .withFailureHandler((err) => {
+          comprehensionResult.textContent = 'Erreur de lecture de la sélection : ' + err.message;
+          comprehensionBtn.disabled = false;
+        })
+        .getSelectionText();
+    };
+
+    const generateExBtn = document.getElementById('generate-ex-btn');
+    generateExBtn.onclick = () => {
+      const words = selectedWordItems().map((item) => item.dataset.word);
+      if (!words.length) {
+        alert('Coche au moins un mot pour générer des exercices.');
+        return;
+      }
+      /*
+        Les exercices s'affichent dans un dialogue Apps Script separe (plus grand que la
+        sidebar, fermable independamment) plutot qu'inline ici — voir Code.gs et
+        ExercisesDialog.html. Les mots coches lui sont transmis via CacheService (meme
+        mecanisme que le texte du test de lecture) : un dialogue modal ne peut pas lire
+        le DOM de la sidebar.
+      */
+      generateExBtn.disabled = true;
+      google.script.run
+        .withSuccessHandler(() => { generateExBtn.disabled = false; })
+        .withFailureHandler(() => { generateExBtn.disabled = false; })
+        .startExercises(words);
+    };
+
+    const readingTestBtn = document.getElementById('reading-test-btn');
+    const readingTestSection = document.getElementById('reading-test-section');
+
+    // Le perimetre du test depend de l'application hote (voir Code.gs:getReadingTestText) :
+    // dans Docs l'eleve selectionne son passage, dans Slides c'est toute la presentation,
+    // dans Sheets le test n'existe pas — la section reste alors masquee.
+    google.script.run
+      .withSuccessHandler((host) => {
+        if (host === 'sheets' || !host) return;
+        readingTestSection.style.display = 'block';
+      })
+      .getActiveHost();
+
+    const readingTestResult = document.getElementById('reading-test-result');
+
+    // Messages de refus affiches ICI et non dans le dialogue : startReadingTest() lit et
+    // valide le texte avant d'ouvrir quoi que ce soit, donc en cas de refus aucune fenetre
+    // ne s'ouvre — l'eleve reste dans la sidebar, corrige sa selection et reclique.
+    function readingTestRefusMessage(reason, host) {
+      if (reason === 'no_selection') {
+        return 'Sélectionne d\'abord, dans le document, le texte sur lequel tu veux être interrogé.';
+      }
+      if (reason === 'too_short') {
+        return host === 'slides'
+          ? 'Le texte de cette présentation est trop court pour générer un test.'
+          : 'Le passage sélectionné est trop court — sélectionne un texte plus long.';
+      }
+      return 'Le test de lecture n\'est pas disponible ici.';
+    }
+
+    readingTestBtn.onclick = () => {
+      // Meme choix que les exercices : un dialogue modal plutot que la sidebar (10 QCM +
+      // appariement en deux colonnes n'y tiennent pas). Voir Code.gs:startReadingTest().
+      readingTestBtn.disabled = true;
+      readingTestResult.style.display = 'none';
+      google.script.run
+        .withSuccessHandler((result) => {
+          readingTestBtn.disabled = false;
+          if (result && result.ok) return;
+          readingTestResult.style.display = 'block';
+          readingTestResult.textContent = readingTestRefusMessage(
+            (result && result.reason) || 'unsupported_host',
+            result && result.host
+          );
+        })
+        .withFailureHandler((err) => {
+          readingTestBtn.disabled = false;
+          readingTestResult.style.display = 'block';
+          readingTestResult.textContent = 'Erreur : ' + err.message;
+        })
+        .startReadingTest();
+    };
+  </script>
+</body>
+</html>

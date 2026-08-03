@@ -1,0 +1,58 @@
+# Configuration Firebase App Hosting.
+#
+# Aucune de ces valeurs n'est secrete : les cles NEXT_PUBLIC_* sont de toute
+# facon lisibles dans le navigateur, et les autres ne sont que des listes
+# d'autorisation. Le jour ou un vrai secret apparait, passer par
+# `secret: <nom>` (Secret Manager) plutot que `value:`.
+
+runConfig:
+  minInstances: 0
+  maxInstances: 2
+  concurrency: 80
+  cpu: 1
+  memoryMiB: 512
+
+env:
+  # --- Configuration Firebase cote navigateur ---
+  - variable: NEXT_PUBLIC_FIREBASE_API_KEY
+    value: AIzaSyADUY1XqUA20TkrnhsfeaARZLdjVTaDv9I
+    availability: [BUILD, RUNTIME]
+  - variable: NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN
+    value: essai-27712.firebaseapp.com
+    availability: [BUILD, RUNTIME]
+  - variable: NEXT_PUBLIC_FIREBASE_PROJECT_ID
+    value: essai-27712
+    availability: [BUILD, RUNTIME]
+  - variable: NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET
+    value: essai-27712.firebasestorage.app
+    availability: [BUILD, RUNTIME]
+  - variable: NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID
+    value: "474562157268"
+    availability: [BUILD, RUNTIME]
+  - variable: NEXT_PUBLIC_FIREBASE_APP_ID
+    value: "1:474562157268:web:442bdb949ad8b99283b941"
+    availability: [BUILD, RUNTIME]
+
+  # Jamais d'emulateur en production.
+  - variable: NEXT_PUBLIC_USE_FIREBASE_EMULATORS
+    value: "false"
+    availability: [BUILD, RUNTIME]
+
+  # --- Cote serveur ---
+  # Ce compte est promu administrateur a sa premiere connexion, quoi que dise
+  # son document `users`. C'est le filet qui evite de se verrouiller dehors.
+  - variable: ADMIN_EMAIL
+    value: jeanphilippe.bolle@cnddinant.be
+    availability: [RUNTIME]
+
+  # Clients OAuth autorises a appeler /api/ingest. Une LISTE, jamais un client
+  # ID en dur : le module Google Docs s'ajoutera ici sans toucher au code.
+  - variable: ALLOWED_AUDIENCES
+    value: 474562157268-oboltab8hgo100pnd2l5r0mn5vs3rqq7.apps.googleusercontent.com
+    availability: [RUNTIME]
+
+  # Origines CORS acceptees : l'extension publiee, et la copie non empaquetee
+  # utilisee en developpement (son ID derive du chemin du dossier).
+  - variable: ALLOWED_INGEST_ORIGINS
+    value: chrome-extension://dfamiepedkpjldfbdcmdchjfopnhnkgf,chrome-extension://gajbdjbcnecaclanoenlhkcckmfdjffk
+    availability: [RUNTIME]

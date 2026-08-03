@@ -375,4 +375,3 @@ captureBtn.addEventListener('click', () => {
 });
 
 // Bouton gen-questions supprimé car non présent dans le HTML
-

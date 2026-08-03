@@ -1,0 +1,107 @@
+rules_version = '2';
+
+// Daspalecte — regles Firestore.
+//
+// Principe : le client ne fait que LIRE. Toutes les ecritures passent par
+// l'Admin SDK (routes Next.js /api/*), qui contourne ces regles.
+//
+// Le role vit dans un custom claim Firebase Auth (`admin` | `teacher` | `student`),
+// pose par le serveur au premier login. On le lit directement dans le token :
+// aucun get() Firestore dans les regles, sinon chaque document liste couterait
+// une lecture supplementaire et on toucherait vite la limite de 20 get() par requete.
+// C'est pour la meme raison que studentId/teacherId sont denormalises sur chaque
+// document, y compris les events imbriques dans une session.
+//
+// Attention : l'identifiant utilise partout est le `sub` Google, pas
+// request.auth.uid (l'uid Firebase Auth). L'extension et l'add-on n'ont qu'un
+// access token Google et ne connaissent que le `sub` ; il est donc recopie dans
+// le custom claim `gsub`, et c'est LUI qu'on compare ici.
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function signedIn() {
+      return request.auth != null;
+    }
+
+    function role() {
+      return request.auth.token.get('role', 'none');
+    }
+
+    function me() {
+      return request.auth.token.get('gsub', '');
+    }
+
+    function isAdmin() {
+      return signedIn() && role() == 'admin';
+    }
+
+    function isTeacher() {
+      return signedIn() && role() == 'teacher';
+    }
+
+    function isSelf(uid) {
+      return signedIn() && me() == uid;
+    }
+
+    // Un prof ne voit que les eleves qu'il a inscrits.
+    function ownsStudent(teacherId) {
+      return isTeacher() && me() == teacherId;
+    }
+
+    // Un eleve voit ses propres donnees, son prof aussi, l'admin voit tout.
+    function canReadStudentData(studentId, teacherId) {
+      return isSelf(studentId) || ownsStudent(teacherId) || isAdmin();
+    }
+
+    // --- Utilisateurs -------------------------------------------------------
+    match /users/{uid} {
+      allow read: if isSelf(uid)
+                  || isAdmin()
+                  || (isTeacher() && resource.data.teacherId == me());
+      allow write: if false;
+
+      // Les mots travailles par l'eleve, agreges sur toutes ses sessions.
+      match /vocabulary/{wordId} {
+        allow read: if isSelf(uid)
+                    || isAdmin()
+                    || (isTeacher() && resource.data.teacherId == me());
+        allow write: if false;
+      }
+    }
+
+    // --- Invitations (pre-inscription par email) ----------------------------
+    match /invitations/{emailKey} {
+      allow read: if isAdmin()
+                  || (isTeacher() && resource.data.invitedBy == me());
+      allow write: if false;
+    }
+
+    // --- Sessions de travail ------------------------------------------------
+    match /sessions/{sessionId} {
+      allow read: if canReadStudentData(resource.data.studentId, resource.data.teacherId);
+      allow write: if false;
+
+      match /events/{eventId} {
+        allow read: if canReadStudentData(resource.data.studentId, resource.data.teacherId);
+        allow write: if false;
+      }
+    }
+
+    // --- Resultats ----------------------------------------------------------
+    match /readingTests/{testId} {
+      allow read: if canReadStudentData(resource.data.studentId, resource.data.teacherId);
+      allow write: if false;
+    }
+
+    match /exerciseResults/{resultId} {
+      allow read: if canReadStudentData(resource.data.studentId, resource.data.teacherId);
+      allow write: if false;
+    }
+
+    // Tout le reste est ferme.
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

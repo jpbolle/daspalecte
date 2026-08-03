@@ -1,0 +1,118 @@
+@import "tailwindcss";
+
+/*
+ * Thème Classica — miroir de themes.css de l'extension Daspalecte.
+ * Toute valeur ci-dessous vient du bloc :root[data-daspalecte-theme="classica"]
+ * (themes.css:127-244). Ne pas diverger sans répercuter dans les deux sens.
+ */
+@theme {
+  /* Couleurs */
+  --color-primary: #2d6a5a;
+  --color-primary-hover: #357a68;
+  --color-accent: #d4944c;
+  --color-accent-strong: #c4862e;
+  --color-accent-ink: #7a4d18;
+
+  --color-bg: #faf6f0;
+  --color-card: #ffffff;
+  --color-element: #f0ebe3;
+
+  --color-ink: #3d3832;
+  --color-ink-secondary: #5a534b;
+  --color-ink-muted: #6b6259;
+  --color-ink-dim: #766c61;
+  --color-on-primary: #ffffff;
+  --color-on-accent: #2e1c0a;
+
+  --color-line: #d5cec4;
+  --color-line-strong: #b5ad9f;
+
+  --color-danger: #b44040;
+  --color-success: #2d8a4e;
+  --color-warning: #c4862e;
+
+  /* Polices — les variables --font-playfair/--font-inter sont posées par next/font */
+  --font-title: var(--font-playfair), Georgia, serif;
+  --font-body: var(--font-inter), -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
+
+  /* Rayons — Classica reste sobre : 4px partout, 8px pour les grandes surfaces */
+  --radius-sm: 4px;
+  --radius-lg: 8px;
+  --radius-xl: 8px;
+
+  /* Ombres — douces et neutres, jamais de glow coloré (voir skill design-classica) */
+  --shadow-card: 0 2px 8px rgba(0, 0, 0, 0.08);
+  --shadow-lift: 0 4px 14px rgba(0, 0, 0, 0.1);
+  --shadow-popup: 0 4px 16px rgba(0, 0, 0, 0.15), 0 1px 4px rgba(0, 0, 0, 0.1);
+}
+
+/*
+ * Alias --t-* : permettent de reprendre tel quel du CSS de l'extension
+ * (sidepanel.css, content.css) sans réécrire les noms de variables.
+ */
+:root {
+  color-scheme: light;
+
+  --t-primary: var(--color-primary);
+  --t-accent: var(--color-accent);
+  --t-bg: var(--color-bg);
+  --t-bg-card: var(--color-card);
+  --t-bg-element: var(--color-element);
+  --t-text: var(--color-ink);
+  --t-text-secondary: var(--color-ink-secondary);
+  --t-text-muted: var(--color-ink-muted);
+  --t-border: var(--color-line);
+
+  --t-primary-a08: rgba(45, 106, 90, 0.08);
+  --t-primary-a15: rgba(45, 106, 90, 0.15);
+  --t-primary-a30: rgba(45, 106, 90, 0.3);
+  --t-accent-a15: rgba(212, 148, 76, 0.15);
+
+  --t-gradient-btn: linear-gradient(90deg, #2d6a5a, #357a68);
+  --t-gradient-panel: linear-gradient(180deg, rgba(45, 106, 90, 0.02), rgba(212, 148, 76, 0.02));
+
+  --t-title-spacing: 1px;
+  --t-btn-spacing: 2px;
+}
+
+body {
+  background: var(--color-bg);
+  color: var(--color-ink);
+  font-family: var(--font-body);
+  -webkit-font-smoothing: antialiased;
+}
+
+h1,
+h2,
+h3 {
+  font-family: var(--font-title);
+  letter-spacing: var(--t-title-spacing);
+  color: var(--color-primary);
+}
+
+/* Focus visible cohérent sur toute l'app — accessibilité clavier */
+:focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 2px;
+  border-radius: 2px;
+}
+
+::selection {
+  background: rgba(45, 106, 90, 0.2);
+}
+
+/* Scrollbars discrètes, mêmes valeurs que themes.css */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(0, 0, 0, 0.12) rgba(0, 0, 0, 0.02);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}

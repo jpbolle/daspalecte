@@ -1,3 +1,16 @@
+// Envoi des resultats vers l'app web (sessions, file d'attente, jeton Google).
+// Charge ici et pas dans content.js : un content script meurt a chaque
+// navigation, la session en cours ne survivrait pas.
+// Le try/catch n'est pas decoratif : si analytics.js echoue (permission
+// manquante, API indisponible), une exception ici ferait echouer TOUT
+// l'enregistrement du service worker — donc plus de synthese vocale, plus de
+// capture d'ecran. Le suivi des resultats est accessoire, il doit tomber seul.
+try {
+  importScripts('analytics.js');
+} catch (error) {
+  console.error('[BG] suivi des resultats indisponible :', error);
+}
+
 chrome.runtime.onInstalled.addListener(() => {
   console.log("Daspalecte extension installed.");
 });

@@ -1,0 +1,2176 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <base target="_top">
+  <meta charset="utf-8">
+  <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;700;900&family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    /* Variables portees depuis themes.css (theme Classica), identiques a Sidebar.html —
+       dupliquees ici car cette page est une fenetre independante (dialogue Apps Script),
+       pas une iframe partageant les styles de la sidebar. */
+    /* Variables portees depuis themes.css (theme Classica — demande explicite : pas de
+       Cyberpunk ici), valeurs exactes reprises de themes.css:127-149. */
+    :root {
+      --t-bg: #faf6f0;
+      --t-bg-card: #ffffff;
+      --t-primary: #2d6a5a;
+      --t-accent: #d4944c;
+      --t-text: #3d3832;
+      --t-text-muted: #6b6259;
+      --t-glass-bg: rgba(45, 106, 90, 0.04);
+      --t-glass-bg-hover: rgba(45, 106, 90, 0.08);
+      --t-border: #d5cec4;
+      --t-danger: #b44040;
+      --t-radius: 4px;
+      --t-radius-sm: 4px;
+      --t-radius-lg: 8px;
+      --t-font-title: 'Playfair Display', Georgia, serif;
+      --t-font-body: 'Inter', -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
+
+      /* Variables additionnelles pour les exercices (etape 6 du plan), reprises
+         telles quelles de themes.css:133-223 (bloc Classica) — cette sidebar ne
+         charge pas themes.css, les valeurs doivent donc etre dupliquees ici. */
+      --t-success: #2d8a4e;
+      --t-bg-element: #f0ebe3;
+      --t-text-secondary: #5a534b;
+      --t-text-on-primary: #ffffff;
+      --t-text-on-accent: #2e1c0a;
+      --t-primary-a05: rgba(45, 106, 90, 0.05);
+      --t-primary-a08: rgba(45, 106, 90, 0.08);
+      --t-primary-a10: rgba(45, 106, 90, 0.10);
+      --t-primary-a20: rgba(45, 106, 90, 0.20);
+      --t-primary-a30: rgba(45, 106, 90, 0.30);
+      --t-primary-a40: rgba(45, 106, 90, 0.40);
+      --t-primary-a50: rgba(45, 106, 90, 0.50);
+      --t-shadow-glow: 0 2px 8px rgba(0, 0, 0, 0.1);
+      --t-shadow-glow-strong: 0 2px 8px rgba(0, 0, 0, 0.15);
+      --t-translation-bg: #2d6a5a;
+      --t-translation-text: #ffffff;
+    }
+
+    /* Mise en page dialogue. Le dialogue est demande quasi plein ecran (voir DIALOG_WIDTH
+       dans Code.gs) pour masquer le document et la liste de vocabulaire, qui contiennent les
+       reponses : le fond doit donc etre opaque sur TOUTE la surface (html + body).
+       Le body est une colonne flex — c'est elle qui centre et aligne l'en-tete, le corps et le
+       pied sur une meme largeur, et qui pousse le pied en bas de la fenetre. Un simple
+       `margin: auto` sur les enfants ne suffisait pas : plusieurs d'entre eux redefinissent
+       leur `margin` en raccourci plus bas et se retrouvaient decales a gauche. */
+    html {
+      height: 100%;
+      background: var(--t-bg);
+    }
+
+    body {
+      margin: 0;
+      padding: 26px 32px 24px;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      background: var(--t-bg);
+      color: var(--t-text);
+      font-family: var(--t-font-body);
+      box-sizing: border-box;
+    }
+
+    body > * {
+      width: 100%;
+      max-width: 1000px;
+      flex-shrink: 0;
+    }
+
+    .hint {
+      font-size: 12px;
+      color: var(--t-text-muted);
+      margin: 0 0 10px;
+      line-height: 1.4;
+    }
+    .btn {
+      font-weight: 600;
+      color: #ffffff;
+      background: var(--t-primary);
+      border: none;
+      border-radius: var(--t-radius);
+      padding: 8px 14px;
+      cursor: pointer;
+    }
+
+    .btn:hover {
+      opacity: 0.9;
+    }
+
+    .btn:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+    /* ============================================================
+       EXERCICES (etape 6 du plan) — styles adaptes de content.css,
+       sans les hacks defensifs "all: initial !important" (inutiles
+       ici : iframe HtmlService isolee, pas de CSS de page hote a
+       contrer), et avec des tailles reduites pour la largeur etroite
+       de la sidebar (contrairement a l'overlay plein ecran de
+       l'extension Chrome).
+       ============================================================ */
+    .btn-secondary {
+      font-weight: 600;
+      font-family: var(--t-font-body);
+      font-size: 13px;
+      color: var(--t-text-muted);
+      background: var(--t-glass-bg);
+      border: 1px solid var(--t-border);
+      border-radius: var(--t-radius);
+      padding: 8px 14px;
+      cursor: pointer;
+    }
+
+    .btn-secondary:hover {
+      background: var(--t-glass-bg-hover);
+    }
+
+    .btn-secondary:disabled, .btn:disabled {
+      opacity: 0.4;
+      cursor: not-allowed;
+    }
+
+    .ex-view {
+      display: none;
+    }
+
+    /* Centre le chargement dans un corps devenu plein ecran, plutot que de le coller en haut. */
+    .ex-loader {
+      min-height: 100%;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      text-align: center;
+      padding: 30px 10px;
+      box-sizing: border-box;
+    }
+
+    .ex-spinner {
+      width: 40px;
+      height: 40px;
+      border: 4px solid var(--t-primary-a20);
+      border-top: 4px solid var(--t-primary);
+      border-radius: 50%;
+      animation: ex-spin 1s linear infinite;
+      margin: 0 auto 14px;
+    }
+
+    @keyframes ex-spin {
+      to { transform: rotate(360deg); }
+    }
+
+    .ex-step-counter {
+      display: block;
+      color: var(--t-accent);
+      font-family: var(--t-font-title);
+      font-size: 11px;
+      letter-spacing: 2px;
+      text-transform: uppercase;
+    }
+
+    #ex-title {
+      font-family: var(--t-font-title);
+      font-size: 22px;
+      color: var(--t-primary);
+      margin: 6px 0;
+    }
+
+    .ex-desc-text {
+      color: var(--t-text-muted);
+      font-size: 14px;
+      font-style: italic;
+      margin: 0;
+      line-height: 1.5;
+    }
+
+    /* Le corps occupe toute la hauteur restante : le pied reste ainsi ancre en bas de la
+       fenetre quel que soit l'exercice, au lieu de remonter sous un contenu court en
+       laissant une grande zone vide dessous. */
+    .ex-body {
+      flex: 1 1 auto;
+      min-height: 0;
+      overflow-y: auto;
+      margin: 18px 0;
+      padding: 24px;
+      background: var(--t-glass-bg);
+      border-radius: var(--t-radius-lg);
+      font-size: 15px;
+    }
+
+    .ex-footer {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+
+    .ex-nav-buttons, .ex-action-buttons {
+      display: flex;
+      gap: 8px;
+    }
+
+    .ex-nav-buttons {
+      justify-content: space-between;
+    }
+
+    .ex-action-buttons {
+      justify-content: flex-end;
+    }
+
+    .ex-dots {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: center;
+      gap: 6px;
+    }
+
+    .ex-dot {
+      width: 8px;
+      height: 8px;
+      padding: 0;
+      border: none;
+      border-radius: 50%;
+      background: var(--t-border);
+      cursor: pointer;
+    }
+
+    .ex-dot:hover:not(:disabled) {
+      background: var(--t-primary-a50);
+    }
+
+    .ex-dot.completed {
+      background: var(--t-success);
+    }
+
+    .ex-dot.active {
+      background: var(--t-primary);
+      box-shadow: var(--t-shadow-glow);
+    }
+
+    .ex-dot:disabled {
+      cursor: not-allowed;
+      opacity: 0.5;
+    }
+
+    .ex-result {
+      margin-top: 12px;
+      text-align: center;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .ex-score {
+      font-size: 13px;
+      font-weight: 600;
+      margin: 0;
+    }
+
+    .ex-score-success { color: var(--t-success); }
+    .ex-score-fail { color: var(--t-danger); }
+
+    .ex-finish {
+      text-align: center;
+      padding: 30px 10px;
+    }
+
+    .ex-finish .trophy {
+      font-size: 50px;
+      margin-bottom: 14px;
+    }
+
+    .daspalecte-translation-bubble {
+      display: inline-block;
+      margin-left: 4px;
+      padding: 1px 6px;
+      background: var(--t-translation-bg);
+      color: var(--t-translation-text);
+      border-radius: 4px;
+      font-size: 11px;
+    }
+
+    /* Associations / Ecoute et associe */
+    .matching-cols {
+      display: flex;
+      /* Large ecart entre les colonnes : les lignes SVG qui relient les paires trouvees
+         doivent etre visibles. Meme valeur que .matching-container de l'extension
+         (content.css) — la sidebar etroite avait impose un 12px qui les ecrasait. */
+      gap: 80px;
+      justify-content: center;
+    }
+
+    /* Colonnes bornees : dans un dialogue quasi plein ecran, des etiquettes etirees sur
+       400px chacune seraient illisibles et l'ecart entre colonnes deviendrait un gouffre. */
+    .matching-col {
+      flex: 1 1 0;
+      min-width: 0;
+      max-width: 330px;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+
+    .match-item {
+      background: var(--t-bg-card);
+      border: 2px solid var(--t-border);
+      padding: 12px 14px;
+      border-radius: var(--t-radius);
+      cursor: pointer;
+      text-align: center;
+      font-size: 15px;
+      font-weight: 500;
+      word-break: break-word;
+    }
+
+    .match-item:hover {
+      border-color: var(--t-primary);
+      background: var(--t-glass-bg-hover);
+    }
+
+    .match-item.selected {
+      border-color: var(--t-primary);
+      background: var(--t-primary-a10);
+      box-shadow: var(--t-shadow-glow-strong);
+    }
+
+    .match-item.matched {
+      border-color: var(--t-success);
+      background: color-mix(in srgb, var(--t-success) 12%, transparent);
+      color: var(--t-success);
+      cursor: default;
+      opacity: 0.65;
+    }
+
+    .match-item.error {
+      border-color: var(--t-danger);
+      background: color-mix(in srgb, var(--t-danger) 10%, transparent);
+      animation: ex-shake 0.4s ease-in-out;
+    }
+
+    .match-item-audio {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+    }
+
+    @keyframes ex-shake {
+      0%, 100% { transform: translateX(0); }
+      25% { transform: translateX(-5px); }
+      75% { transform: translateX(5px); }
+    }
+
+    /* Etiquettes */
+    .tags-sentences {
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+      margin-bottom: 14px;
+    }
+
+    .tags-sentence-item {
+      font-size: 13.5px;
+      line-height: 1.7;
+    }
+
+    .tags-bullet {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 18px;
+      height: 18px;
+      border-radius: 50%;
+      background: var(--t-accent);
+      color: var(--t-text-on-accent);
+      font-size: 10px;
+      margin-right: 6px;
+    }
+
+    .drop-zone {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      min-width: 60px;
+      min-height: 28px;
+      padding: 3px 8px;
+      margin: 0 3px;
+      border-bottom: 2px dashed var(--t-primary);
+      color: var(--t-primary);
+      cursor: pointer;
+    }
+
+    .drop-zone.filled {
+      border: 1px solid var(--t-primary-a50);
+      border-bottom: 2px solid var(--t-primary);
+      border-radius: var(--t-radius-sm);
+      background: var(--t-primary-a05);
+    }
+
+    .drop-zone.correct {
+      border-color: var(--t-success);
+      color: var(--t-success);
+    }
+
+    .drop-zone.error {
+      border-color: var(--t-danger);
+      color: var(--t-danger);
+      animation: ex-shake 0.4s ease-in-out;
+    }
+
+    .tags-pool {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      padding: 12px;
+      background: var(--t-glass-bg);
+      border-radius: var(--t-radius-lg);
+      justify-content: center;
+    }
+
+    .tag-item {
+      display: inline-flex;
+      align-items: center;
+      background: var(--t-bg-element);
+      border: 1px solid var(--t-primary);
+      color: var(--t-primary);
+      padding: 5px 10px;
+      border-radius: var(--t-radius);
+      cursor: grab;
+      font-size: 12.5px;
+    }
+
+    .tag-item:hover {
+      background: var(--t-primary);
+      color: var(--t-text-on-primary);
+    }
+
+    .tag-item.selected {
+      background: var(--t-primary);
+      color: var(--t-text-on-primary);
+      box-shadow: 0 0 0 2px var(--t-primary-a40);
+    }
+
+    /* Famille de mots */
+    .families-list {
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+    }
+
+    .family-card {
+      perspective: 1000px;
+      min-height: 190px;
+    }
+
+    .family-card-inner {
+      position: relative;
+      width: 100%;
+      height: 100%;
+      min-height: 190px;
+      transition: transform 0.5s ease;
+      transform-style: preserve-3d;
+    }
+
+    .family-card.flipped .family-card-inner {
+      transform: rotateY(180deg);
+    }
+
+    /* Toute la carte est le declencheur du retournement (il n'y a plus de bouton 🔄) :
+       le curseur main doit le faire comprendre au premier coup d'oeil. */
+    .family-card-front, .family-card-back {
+      position: absolute;
+      inset: 0;
+      backface-visibility: hidden;
+      -webkit-backface-visibility: hidden;
+      background: var(--t-bg-card);
+      border: 1px solid var(--t-primary-a20);
+      border-radius: 10px;
+      padding: 18px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 14px;
+      box-sizing: border-box;
+      cursor: pointer;
+      transition: border-color 0.2s ease, box-shadow 0.2s ease;
+    }
+
+    .family-card-front:hover, .family-card-back:hover {
+      border-color: var(--t-primary);
+      box-shadow: var(--t-shadow-soft);
+    }
+
+    .family-card-back {
+      transform: rotateY(180deg);
+    }
+
+    .family-main-word {
+      background: var(--t-primary);
+      color: var(--t-text-on-primary);
+      padding: 8px 20px;
+      border-radius: 20px;
+      font-family: var(--t-font-title);
+      font-weight: bold;
+      font-size: 16px;
+      text-transform: uppercase;
+    }
+
+    .family-related {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      justify-content: center;
+    }
+
+    .related-tag {
+      position: relative;
+      background: var(--t-accent);
+      color: var(--t-text-on-accent);
+      padding: 7px 14px;
+      border-radius: 16px;
+      font-size: 14px;
+    }
+
+    .related-tag-translation {
+      position: absolute;
+      bottom: 100%;
+      left: 50%;
+      transform: translateX(-50%);
+      margin-bottom: 4px;
+      padding: 2px 6px;
+      background: var(--t-translation-bg);
+      color: var(--t-translation-text);
+      border-radius: 4px;
+      font-size: 10px;
+      white-space: nowrap;
+      z-index: 5;
+      pointer-events: none;
+    }
+
+    .family-inputs {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      width: 100%;
+    }
+
+    .family-input {
+      padding: 8px 10px;
+      border-radius: var(--t-radius-sm);
+      border: 1px solid var(--t-border);
+      background: var(--t-bg-element);
+      color: var(--t-text);
+      font-size: 14px;
+      text-align: center;
+      box-sizing: border-box;
+      cursor: text;
+    }
+
+    .family-input.correct {
+      border-color: var(--t-success);
+      color: var(--t-success);
+    }
+
+    .family-input.incorrect {
+      border-color: var(--t-danger);
+      color: var(--t-danger);
+    }
+
+    /* Defi (texte a trous) */
+    .cloze-items {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+
+    .cloze-item {
+      font-size: 13.5px;
+      line-height: 1.7;
+    }
+
+    .cloze-input {
+      background: var(--t-bg-card);
+      border: none;
+      border-bottom: 2px solid var(--t-primary);
+      color: var(--t-primary);
+      padding: 3px 8px;
+      font-size: 13px;
+      width: 110px;
+      text-align: center;
+    }
+
+    .cloze-input.correct {
+      border-color: var(--t-success);
+      color: var(--t-success);
+    }
+
+    .cloze-input.error {
+      border-color: var(--t-danger);
+      color: var(--t-danger);
+      animation: ex-shake 0.4s ease-in-out;
+    }
+
+    /* Phrase avec le vocabulaire */
+    .sentence-textarea {
+      background: var(--t-bg-card);
+      border: 1px solid var(--t-primary-a50);
+      border-radius: var(--t-radius);
+      color: var(--t-text);
+      padding: 10px;
+      font-size: 13px;
+      width: 100%;
+      box-sizing: border-box;
+      min-height: 70px;
+      resize: vertical;
+      font-family: var(--t-font-body);
+    }
+
+    .sentence-counter {
+      color: var(--t-text-muted);
+      font-size: 11px;
+      text-align: center;
+      margin: 6px 0 0;
+    }
+
+    .sentence-word-chip {
+      cursor: default;
+    }
+
+    .sentence-word-chip:hover {
+      background: var(--t-bg-element);
+      color: var(--t-primary);
+    }
+
+    .sentence-word-chip.used {
+      border-color: var(--t-success);
+      color: var(--t-success);
+      background: color-mix(in srgb, var(--t-success) 12%, var(--t-bg-element));
+    }
+
+    .sentence-word-feedback-list {
+      list-style: none;
+      margin: 0 0 8px;
+      padding: 0;
+      text-align: left;
+      font-size: 12px;
+    }
+
+    .sentence-word-feedback-list li {
+      margin-bottom: 4px;
+    }
+
+    .sentence-word-feedback-ok { color: var(--t-success); }
+    .sentence-word-feedback-bad { color: var(--t-danger); }
+
+    .sentence-corrected {
+      font-size: 12px;
+      font-style: italic;
+      color: var(--t-accent);
+    }
+
+    /* Lecture */
+    .reading-text {
+      line-height: 2.2;
+      font-size: 13.5px;
+      color: var(--t-text-secondary);
+    }
+
+    .reading-sentence {
+      display: flex;
+      align-items: flex-start;
+      gap: 8px;
+      margin-bottom: 6px;
+    }
+
+    .reading-sentence-play {
+      flex-shrink: 0;
+      width: 24px;
+      height: 24px;
+      border-radius: 50%;
+      border: 1px solid var(--t-border);
+      background: var(--t-glass-bg);
+      cursor: pointer;
+      font-size: 11px;
+      padding: 0;
+    }
+
+    .reading-sentence-play.played {
+      border-color: var(--t-success);
+      background: color-mix(in srgb, var(--t-success) 15%, transparent);
+    }
+
+    .reading-word {
+      border-radius: 3px;
+      padding: 0 1px;
+      cursor: pointer;
+    }
+
+    .reading-word:hover {
+      background: var(--t-primary-a10);
+    }
+
+    .reading-word-translation {
+      font-style: italic;
+      opacity: 0.7;
+      cursor: default;
+    }
+
+    .reading-word-active {
+      background: var(--t-primary-a30);
+      box-shadow: var(--t-shadow-glow);
+    }
+
+    .reading-correct {
+      background: color-mix(in srgb, var(--t-success) 18%, transparent);
+      color: var(--t-success);
+    }
+
+    .reading-incorrect {
+      background: color-mix(in srgb, var(--t-danger) 18%, transparent);
+      color: var(--t-danger);
+    }
+
+    .reading-toolbar {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex-wrap: wrap;
+      margin: 10px 0;
+      font-size: 11px;
+      color: var(--t-text-muted);
+    }
+
+    .reading-speed-btn {
+      width: 22px;
+      height: 22px;
+      border-radius: 50%;
+      border: 1px solid var(--t-border);
+      background: var(--t-glass-bg);
+      cursor: pointer;
+      font-size: 10px;
+      padding: 0;
+    }
+
+    .reading-record-btn.recording {
+      border-color: var(--t-danger);
+      color: var(--t-danger);
+    }
+
+    .reading-feedback {
+      margin-top: 10px;
+      font-size: 12px;
+      color: var(--t-text-secondary);
+    }
+  </style>
+</head>
+<body>
+  <!-- Ni titre ni croix ici : le dialogue Apps Script affiche deja "Exercices — Daspalecte"
+       et son propre bouton de fermeture dans sa barre de fenetre. Le pied de page garde
+       "Fermer" pour la sortie explicite. -->
+  <div class="ex-header" id="ex-header">
+    <span class="ex-step-counter" id="ex-step-counter"></span>
+    <h2 id="ex-title"></h2>
+    <p class="ex-desc-text" id="ex-desc"></p>
+  </div>
+  <div class="ex-body" id="ex-body">
+    <div class="ex-loader"><div class="ex-spinner"></div><p>Chargement du vocabulaire...</p></div>
+  </div>
+  <div class="ex-footer" id="ex-footer" style="display:none;">
+    <div class="ex-nav-buttons">
+      <button id="ex-btn-prev" class="btn-secondary" type="button">← Précédent</button>
+      <button id="ex-btn-quit" class="btn-secondary" type="button">Fermer</button>
+    </div>
+    <div class="ex-dots" id="ex-dots"></div>
+    <div class="ex-action-buttons">
+      <button id="ex-btn-check" class="btn" type="button">Vérifier</button>
+      <button id="ex-btn-next" class="btn" type="button" style="display:none;">Continuer</button>
+    </div>
+  </div>
+
+  <script>
+    // EXERCICES (etape 6 du plan) — port de content.js (methodes
+    // renderMatching/renderTags/renderReading/renderFamily/renderCloze/
+    // renderSentence/displayExercises), affiches dans un vrai dialogue Apps
+    // Script (ui.showModalDialog, voir Code.gs:startExercises) plutot que
+    // dans la sidebar : espace confortable, fermable par sa croix native ou par
+    // les boutons Fermer/✕ de cette page (google.script.host.close()) — la
+    // sidebar reste utilisable en dessous une fois ce dialogue ferme.
+    // - pas de fetch() direct : tout passe par callCF() -> google.script.run
+    // - pas de chrome.tts : speechSynthesis directement (valide sans freeze,
+    //   voir le plan gas-addon, spike etape 2)
+    // - SpeechRecognition echoue dans l'iframe HtmlService de la sidebar/du dialogue (meme
+    //   spike) : l'enregistrement de l'exercice Lecture ouvre une vraie page du deploiement
+    //   Web App (Recording.html, contexte securise garanti). Le resultat revient par polling
+    //   google.script.run (PAS postMessage : Google bloque les messages entre cette origine
+    //   *.googleusercontent.com et celle de la fenetre d'enregistrement, script.google.com —
+    //   confirme en test reel) — voir openReadingRecordingWindow ci-dessous et Code.gs.
+    // ============================================================
+
+    function callCF(payload) {
+      return new Promise((resolve, reject) => {
+        google.script.run.withSuccessHandler(resolve).withFailureHandler(reject).callCloudFunction(payload);
+      });
+    }
+
+    function speakFrench(text) {
+      if (!('speechSynthesis' in window)) return;
+      window.speechSynthesis.cancel();
+      const utter = new SpeechSynthesisUtterance(text);
+      utter.lang = 'fr-FR';
+      window.speechSynthesis.speak(utter);
+    }
+
+    function escapeHtml(text) {
+      const div = document.createElement('div');
+      div.textContent = text;
+      return div.innerHTML;
+    }
+
+    // --- Comparaison de mots insensible aux accents/casse (genre/nombre pour la
+    // phrase avec le vocabulaire, alphanumerique strict pour l'alignement vocal) ---
+
+    function normalizeSentenceWord(str) {
+      return str.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '');
+    }
+
+    function stripGenderNumber(word) {
+      let w = word;
+      if (w.length > 3 && /[sx]$/.test(w)) w = w.slice(0, -1);
+      if (w.length > 3 && /e$/.test(w)) w = w.slice(0, -1);
+      return w;
+    }
+
+    function wordMatchKey(str) {
+      return stripGenderNumber(normalizeSentenceWord(str));
+    }
+
+    // Deux formes comptent comme le meme mot de vocabulaire si elles partagent un radical d'au
+    // moins 4 lettres. Va plus loin que l'accord en genre/nombre : couvre aussi le transfert
+    // d'une classe grammaticale a l'autre ("critique" → "il critiqua", "rapide" → "rapidement"),
+    // qui est exactement ce que l'exercice cherche a valoriser — sans cela l'eleve qui transforme
+    // le mot serait bloque par le compteur avant meme la verification de Claude.
+    function sameVocabularyWord(a, b) {
+      const ka = wordMatchKey(a);
+      const kb = wordMatchKey(b);
+      if (ka === kb) return true;
+      let i = 0;
+      while (i < ka.length && i < kb.length && ka[i] === kb[i]) i++;
+      return i >= 4;
+    }
+
+    function extractSentenceWords(text) {
+      const regex = /[\p{L}\p{M}'’-]+/gu;
+      const found = [];
+      let match;
+      while ((match = regex.exec(text)) !== null) found.push(wordMatchKey(match[0]));
+      return found;
+    }
+
+    function getFirstSyllableHint(word) {
+      const match = word.match(/^[^aeiouyàâäéèêëïîôöùûüy]*[aeiouyàâäéèêëïîôöùûüy]+[^aeiouyàâäéèêëïîôöùûüy]*/i);
+      return match ? match[0] : word.slice(0, Math.min(2, word.length));
+    }
+
+    // ============================================================
+    // Generation + navigation entre exercices
+    // ============================================================
+
+    const exHeaderEl = document.getElementById('ex-header');
+    const exFooterEl = document.getElementById('ex-footer');
+    const exStepCounterEl = document.getElementById('ex-step-counter');
+    const exTitleEl = document.getElementById('ex-title');
+    const exDescEl = document.getElementById('ex-desc');
+    const exBodyEl = document.getElementById('ex-body');
+    const exDotsEl = document.getElementById('ex-dots');
+    const exBtnPrev = document.getElementById('ex-btn-prev');
+    const exBtnQuit = document.getElementById('ex-btn-quit');
+    const exBtnCheck = document.getElementById('ex-btn-check');
+    const exBtnNext = document.getElementById('ex-btn-next');
+
+    let exercisesArr = [];
+    let exWordsForGen = [];
+    let exTargetLang = '';
+    let currentStep = 0;
+    let completedSteps = new Set();
+
+    // Ferme le dialogue Apps Script (equivalent du "Quitter" de la sidebar, mais cette
+    // fois une vraie fenetre qu'on peut fermer plutot qu'une section a re-basculer).
+    function closeExercisesDialog() {
+      stopReadingActivity();
+      google.script.host.close();
+    }
+
+    // Corrige le prefixe "Exercice N : " selon la position reelle dans le tableau final
+    // (l'insertion cote client de l'ecoute/de la phrase decale forcement la numerotation).
+    function renumberExerciseTitles(exercises) {
+      exercises.forEach((ex, idx) => {
+        if (typeof ex.title === 'string') {
+          ex.title = ex.title.replace(/^Exercice\s*\d*\s*:/, `Exercice ${idx + 1} :`);
+        }
+      });
+      return exercises;
+    }
+
+    // Consigne de l'exercice Lecture imposee cote client plutot que reprise de la reponse
+    // de Claude : elle decrit le deroule reel de l'exercice (texte cliquable, puis ecoute,
+    // puis enregistrement), que le modele ne peut pas deviner.
+    const READING_INSTRUCTION = 'Lisez ce court texte en français, chaque mot est cliquable, puis faites attention à la prononciation des mots...';
+
+    // Construit sans appel IA supplementaire : memes paires que "matching", mais
+    // l'eleve doit ecouter (🔊) chaque mot avant de l'associer.
+    function buildListeningMatchingExercise(matchingExercise) {
+      if (!matchingExercise || !Array.isArray(matchingExercise.pairs) || !matchingExercise.pairs.length) return null;
+      return {
+        type: 'listening_matching',
+        title: 'Exercice : Écoute et associe',
+        description: 'Écoute chaque mot français (🔊) et relie-le à sa traduction.',
+        pairs: matchingExercise.pairs
+      };
+    }
+
+    // Construit sans appel IA supplementaire : seule la verification de la phrase produite
+    // par l'eleve (verify_sentence) passera par Claude.
+    function buildSentenceExercise(words) {
+      const required = Math.max(1, Math.ceil(words.length / 2));
+      return {
+        type: 'sentence',
+        title: 'Exercice : Phrase avec le vocabulaire',
+        description: `Écris une phrase en français qui utilise au moins ${required} mot${required > 1 ? 's' : ''} parmi les ${words.length} appris (soit la moitié).`,
+        words
+      };
+    }
+
+    // Le dialogue est une fenetre independante (pas d'acces direct aux variables de la
+    // sidebar) : il recharge lui-meme le vocabulaire et la langue maternelle au demarrage,
+    // puis lance la generation automatiquement (pas de bouton "Generer" ici, la sidebar
+    // a deja fait ce choix avant d'ouvrir ce dialogue).
+    function startGeneration(words, lang) {
+      exWordsForGen = words;
+      exTargetLang = lang;
+      exHeaderEl.style.display = 'none';
+      exFooterEl.style.display = 'none';
+      exBodyEl.innerHTML = '<div class="ex-loader"><div class="ex-spinner"></div><p>Claude prépare tes exercices...</p></div>';
+
+      google.script.run
+        .withSuccessHandler((data) => {
+          if (!data || !Array.isArray(data.exercises)) {
+            exBodyEl.innerHTML = '<p class="ex-score ex-score-fail">Erreur : ' + (data && data.message ? escapeHtml(data.message) : 'réponse inattendue du serveur.') + '</p>';
+            return;
+          }
+          const ordered = [...data.exercises];
+          const matchingEx = ordered.find((e) => e.type === 'matching');
+          const listeningEx = buildListeningMatchingExercise(matchingEx);
+          if (listeningEx) {
+            const readingIdx = ordered.findIndex((e) => e.type === 'reading');
+            const insertAt = readingIdx === -1 ? ordered.length : readingIdx + 1;
+            ordered.splice(insertAt, 0, listeningEx);
+          }
+          ordered.push(buildSentenceExercise(words));
+          ordered.forEach((e) => { if (e.type === 'reading') e.description = READING_INSTRUCTION; });
+          renumberExerciseTitles(ordered);
+
+          exFooterEl.style.display = 'flex';
+          exHeaderEl.style.display = 'block';
+          exercisesArr = ordered;
+          currentStep = 0;
+          completedSteps = new Set();
+          renderExStep();
+        })
+        .withFailureHandler((err) => {
+          exBodyEl.innerHTML = '<p class="ex-score ex-score-fail">Erreur lors de la génération : ' + escapeHtml(err.message) + '</p>';
+        })
+        .callCloudFunction({ action: 'generate_exercises', list: words, targetLanguage: exTargetLang });
+    }
+
+    function loadLanguageThenGenerate(words) {
+      if (!words.length) {
+        exBodyEl.innerHTML = '<p class="ex-score ex-score-fail">Aucun mot sélectionné. Ferme cette fenêtre, coche des mots dans la sidebar, puis réessaie.</p>';
+        return;
+      }
+      google.script.run
+        .withSuccessHandler((lang) => { startGeneration(words, lang); })
+        .withFailureHandler((err) => { exBodyEl.innerHTML = '<p class="ex-score ex-score-fail">Erreur : ' + escapeHtml(err.message) + '</p>'; })
+        .getNativeLanguage();
+    }
+
+    /*
+      Les exercices portent sur les mots COCHES dans la sidebar (meme regle que l'extension),
+      deposes dans CacheService par startExercises(). Repli sur tout le vocabulaire si le
+      cache a expire, pour ne jamais laisser le dialogue vide.
+    */
+    google.script.run
+      .withSuccessHandler((selected) => {
+        if (selected && selected.length) {
+          loadLanguageThenGenerate(selected);
+          return;
+        }
+        google.script.run
+          .withSuccessHandler((vocab) => { loadLanguageThenGenerate((vocab || []).map((item) => item.word)); })
+          .withFailureHandler((err) => { exBodyEl.innerHTML = '<p class="ex-score ex-score-fail">Erreur : ' + escapeHtml(err.message) + '</p>'; })
+          .getVocabulary();
+      })
+      .withFailureHandler((err) => {
+        exBodyEl.innerHTML = '<p class="ex-score ex-score-fail">Erreur : ' + escapeHtml(err.message) + '</p>';
+      })
+      .consumeExerciseWords();
+
+    // Charge en parallele (n'a besoin d'etre pret qu'au moment ou l'eleve atteint l'etape
+    // Enregistrer de l'exercice Lecture, bien plus tard dans la session).
+    google.script.run
+      .withSuccessHandler((url) => { recordingPageUrl = url; })
+      .getRecordingPageUrl();
+
+    function renderExStep() {
+      stopReadingActivity();
+      const ex = exercisesArr[currentStep];
+      exStepCounterEl.textContent = `Exercice ${currentStep + 1} / ${exercisesArr.length}`;
+      exTitleEl.textContent = ex.title;
+      exDescEl.textContent = ex.description;
+      exBodyEl.innerHTML = '';
+      exBtnCheck.style.display = 'none';
+      exBtnCheck.disabled = false;
+      exBtnNext.style.display = 'none';
+
+      // Capture immediate : chaque exercice appelle markCompleted() des qu'il se sait reussi,
+      // plutot que de compter sur la navigation pour le deduire apres coup — sinon un exercice
+      // reussi puis quitte sans passer par "Continuer" laissait son point injoignable.
+      const stepBeingRendered = currentStep;
+      const markCompleted = () => completedSteps.add(stepBeingRendered);
+
+      renderExDots();
+
+      const regenerateCurrentExercise = () => {
+        exBodyEl.innerHTML = '<div class="ex-loader"><div class="ex-spinner"></div><p>Claude régénère cet exercice...</p></div>';
+        google.script.run
+          .withSuccessHandler((data) => {
+            const currentType = exercisesArr[currentStep].type;
+            exercisesArr[currentStep] = (data && data.exercises || []).find((e) => e.type === currentType) || exercisesArr[currentStep];
+            renderExStep();
+          })
+          .withFailureHandler(() => {
+            exBodyEl.innerHTML = '<p class="ex-score ex-score-fail">Impossible de régénérer l\'exercice, réessaie.</p>';
+          })
+          .callCloudFunction({ action: 'generate_exercises', list: exWordsForGen, targetLanguage: exTargetLang });
+      };
+
+      renderExerciseType(ex, exBodyEl, exBtnCheck, exBtnNext, regenerateCurrentExercise, markCompleted);
+
+      // Un exercice deja reussi ne redevient pas obligatoire en y revenant.
+      if (completedSteps.has(currentStep)) {
+        exBtnNext.style.display = 'block';
+      }
+    }
+
+    function goToExStep(idx) {
+      if (exBtnNext.style.display !== 'none') completedSteps.add(currentStep);
+      if (idx >= exercisesArr.length) {
+        showExFinishScreen();
+        return;
+      }
+      currentStep = idx;
+      renderExStep();
+    }
+
+    // Points cliquables : exercice courant, deja reussi, ou le tout premier non encore reussi.
+    function renderExDots() {
+      exDotsEl.innerHTML = '';
+      const maxCompletedIdx = completedSteps.size ? Math.max(...completedSteps) : -1;
+      exercisesArr.forEach((_, idx) => {
+        const dot = document.createElement('button');
+        dot.type = 'button';
+        dot.className = 'ex-dot';
+        if (idx === currentStep) dot.classList.add('active');
+        if (completedSteps.has(idx)) dot.classList.add('completed');
+        const clickable = idx === currentStep || completedSteps.has(idx) || idx === maxCompletedIdx + 1;
+        dot.disabled = !clickable;
+        dot.setAttribute('aria-label', `Exercice ${idx + 1}${completedSteps.has(idx) ? ' (terminé)' : ''}`);
+        dot.onclick = () => { if (clickable) goToExStep(idx); };
+        exDotsEl.appendChild(dot);
+      });
+    }
+
+    exBtnPrev.onclick = () => { if (currentStep > 0) goToExStep(currentStep - 1); };
+    exBtnNext.onclick = () => { goToExStep(currentStep + 1); };
+    exBtnQuit.onclick = closeExercisesDialog;
+
+    function showExFinishScreen() {
+      exHeaderEl.style.display = 'none';
+      exFooterEl.style.display = 'none';
+      exBodyEl.innerHTML = `
+        <div class="ex-finish">
+          <div class="trophy">🏆</div>
+          <h2>Félicitations !</h2>
+          <p>Tu as terminé tous les exercices.</p>
+          <button id="ex-finish-btn" class="btn" type="button">Terminer</button>
+        </div>
+      `;
+      document.getElementById('ex-finish-btn').onclick = closeExercisesDialog;
+    }
+
+    function renderExerciseType(ex, container, btnCheck, btnNext, regenerateExercise, markCompleted) {
+      switch (ex.type) {
+        case 'matching':
+        case 'listening_matching': renderExMatching(ex, container, btnCheck, btnNext, markCompleted); break;
+        case 'tags': renderExTags(ex, container, btnCheck, btnNext, regenerateExercise, markCompleted); break;
+        case 'reading': renderExReading(ex, container, btnCheck, btnNext, markCompleted); break;
+        case 'family': renderExFamily(ex, container, btnCheck, btnNext, markCompleted); break;
+        case 'cloze': renderExCloze(ex, container, btnCheck, btnNext, undefined, markCompleted); break;
+        case 'sentence': renderExSentence(ex, container, btnCheck, btnNext, markCompleted); break;
+      }
+    }
+
+    // ============================================================
+    // Exercice 1 / 5 — Associations / Écoute et associe
+    // ============================================================
+
+    function renderExMatching(ex, container, btnCheck, btnNext, markCompleted) {
+      const audioOnly = ex.type === 'listening_matching';
+      let selectedFr = null, selectedTr = null, selectedFrEl = null, selectedTrEl = null, matchesFound = 0;
+      const totalPairs = ex.pairs.length;
+
+      container.innerHTML = `
+        <div class="matching-wrap" style="position:relative;">
+          <div class="matching-cols">
+            <div class="matching-col" id="ex-col-fr"></div>
+            <div class="matching-col" id="ex-col-tr"></div>
+          </div>
+          <svg id="ex-matching-svg" style="position:absolute;top:0;left:0;width:100%;height:100%;pointer-events:none;"></svg>
+        </div>
+      `;
+
+      const matchingWrap = container.querySelector('.matching-wrap');
+      const colFr = container.querySelector('#ex-col-fr');
+      const colTr = container.querySelector('#ex-col-tr');
+      const svg = container.querySelector('#ex-matching-svg');
+
+      const matchedLines = [];
+      const drawLines = () => {
+        svg.innerHTML = '';
+        const containerRect = matchingWrap.getBoundingClientRect();
+        matchedLines.forEach(({ frEl, trEl }) => {
+          const frRect = frEl.getBoundingClientRect();
+          const trRect = trEl.getBoundingClientRect();
+          // Chaine construite en 3 morceaux : Apps Script supprime tout ce qui suit "//" dans
+          // le script servi (croit a un commentaire, meme a l'interieur d'une chaine), ce qui
+          // tronquait 'http://www.w3.org/2000/svg' en 'http:' et cassait tout le script.
+          const svgNs = 'http:' + '/' + '/www.w3.org/2000/svg';
+          const line = document.createElementNS(svgNs, 'line');
+          line.setAttribute('x1', frRect.right - containerRect.left);
+          line.setAttribute('y1', frRect.top + frRect.height / 2 - containerRect.top);
+          line.setAttribute('x2', trRect.left - containerRect.left);
+          line.setAttribute('y2', trRect.top + trRect.height / 2 - containerRect.top);
+          line.setAttribute('stroke-width', '2');
+          line.setAttribute('opacity', '0.8');
+          line.style.stroke = 'var(--t-success)';
+          svg.appendChild(line);
+        });
+      };
+
+      const frItems = [...ex.pairs].sort(() => Math.random() - 0.5);
+      const trItems = [...ex.pairs].sort(() => Math.random() - 0.5);
+
+      frItems.forEach((pair, idx) => {
+        const el = document.createElement('div');
+        el.className = 'match-item';
+        el.dataset.val = pair.fr;
+        el.tabIndex = 0;
+        el.setAttribute('role', 'button');
+        if (audioOnly) {
+          el.classList.add('match-item-audio');
+          el.innerHTML = `<span>🔊</span><span>Mot ${idx + 1}</span>`;
+          el.setAttribute('aria-label', `Écouter le mot ${idx + 1} et l'associer à sa traduction`);
+        } else {
+          el.textContent = pair.fr;
+          el.setAttribute('aria-label', pair.fr);
+        }
+        const handleSelect = () => {
+          if (el.classList.contains('matched')) return;
+          if (audioOnly) speakFrench(pair.fr);
+          colFr.querySelectorAll('.match-item').forEach((i) => i.classList.remove('selected'));
+          el.classList.add('selected');
+          selectedFr = pair.fr;
+          selectedFrEl = el;
+          checkMatch();
+        };
+        el.onclick = handleSelect;
+        el.addEventListener('keydown', (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); handleSelect(); } });
+        colFr.appendChild(el);
+      });
+
+      trItems.forEach((pair) => {
+        const el = document.createElement('div');
+        el.className = 'match-item';
+        el.textContent = pair.tr;
+        el.dataset.val = pair.fr;
+        el.tabIndex = 0;
+        el.setAttribute('role', 'button');
+        el.setAttribute('aria-label', pair.tr);
+        const handleSelect = () => {
+          if (el.classList.contains('matched')) return;
+          colTr.querySelectorAll('.match-item').forEach((i) => i.classList.remove('selected'));
+          el.classList.add('selected');
+          selectedTr = pair.fr;
+          selectedTrEl = el;
+          checkMatch();
+        };
+        el.onclick = handleSelect;
+        el.addEventListener('keydown', (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); handleSelect(); } });
+        colTr.appendChild(el);
+      });
+
+      function checkMatch() {
+        if (selectedFr && selectedTr) {
+          if (selectedFr === selectedTr) {
+            container.querySelectorAll(`.match-item[data-val="${selectedFr}"]`).forEach((el) => {
+              el.classList.remove('selected');
+              el.classList.add('matched');
+            });
+            matchedLines.push({ frEl: selectedFrEl, trEl: selectedTrEl });
+            drawLines();
+            matchesFound++;
+            if (matchesFound === totalPairs) {
+              btnNext.style.display = 'block';
+              markCompleted();
+            }
+          } else {
+            const items = container.querySelectorAll('.match-item.selected');
+            items.forEach((el) => el.classList.add('error'));
+            setTimeout(() => {
+              items.forEach((el) => { el.classList.remove('selected'); el.classList.remove('error'); });
+            }, 500);
+          }
+          selectedFr = null; selectedTr = null; selectedFrEl = null; selectedTrEl = null;
+        }
+      }
+
+      btnCheck.style.display = 'none';
+      btnNext.style.display = 'none';
+    }
+
+    // ============================================================
+    // Exercice 3 — Étiquettes
+    // ============================================================
+
+    function renderExTags(ex, container, btnCheck, btnNext, regenerateExercise, markCompleted) {
+      let answers = {};
+      let selectedTag = null;
+      const totalItems = ex.items.length;
+
+      container.innerHTML = `
+        <div class="tags-sentences" id="ex-sentences"></div>
+        <div class="tags-pool" id="ex-pool"></div>
+        <div class="ex-result" id="ex-tags-result" style="display:none;"></div>
+      `;
+
+      const sentencesDiv = container.querySelector('#ex-sentences');
+      const poolDiv = container.querySelector('#ex-pool');
+
+      const setupTagDrag = (tag) => {
+        tag.addEventListener('dragstart', (e) => { e.dataTransfer.setData('text/plain', tag.textContent); tag.style.opacity = '0.5'; });
+        tag.addEventListener('dragend', () => { tag.style.opacity = '1'; });
+      };
+
+      const selectTag = (tag) => {
+        if (selectedTag === tag) { tag.classList.remove('selected'); selectedTag = null; return; }
+        if (selectedTag) selectedTag.classList.remove('selected');
+        selectedTag = tag;
+        tag.classList.add('selected');
+      };
+
+      const createTag = (word) => {
+        const tag = document.createElement('div');
+        tag.className = 'tag-item';
+        tag.textContent = word;
+        tag.draggable = true;
+        tag.dataset.word = word;
+        tag.tabIndex = 0;
+        tag.setAttribute('role', 'button');
+        tag.setAttribute('aria-label', `Étiquette : ${word}`);
+        setupTagDrag(tag);
+        tag.addEventListener('click', () => selectTag(tag));
+        tag.addEventListener('keydown', (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); selectTag(tag); } });
+        return tag;
+      };
+
+      const placeOrClear = (idx, dropZone) => {
+        if (selectedTag) {
+          const word = selectedTag.dataset.word;
+          if (answers[idx]) poolDiv.appendChild(createTag(answers[idx]));
+          answers[idx] = word;
+          dropZone.textContent = word;
+          dropZone.classList.add('filled');
+          selectedTag.remove();
+          selectedTag = null;
+          return;
+        }
+        if (answers[idx]) {
+          poolDiv.appendChild(createTag(answers[idx]));
+          delete answers[idx];
+          dropZone.textContent = '...';
+          dropZone.classList.remove('filled');
+        }
+      };
+
+      ex.items.forEach((item, idx) => {
+        const div = document.createElement('div');
+        div.className = 'tags-sentence-item';
+        const htmlText = item.sentence.replace('___', `<span class="drop-zone" data-idx="${idx}" tabindex="0" role="button" aria-label="Zone à compléter">...</span>`);
+        div.innerHTML = `<span class="tags-bullet">${idx + 1}</span>${htmlText}`;
+        sentencesDiv.appendChild(div);
+
+        const dropZone = div.querySelector('.drop-zone');
+        if (!dropZone) return;
+
+        dropZone.addEventListener('dragover', (e) => { e.preventDefault(); dropZone.style.background = 'var(--t-primary-a20)'; });
+        dropZone.addEventListener('dragleave', () => { dropZone.style.background = ''; });
+        dropZone.addEventListener('drop', (e) => {
+          e.preventDefault();
+          dropZone.style.background = '';
+          if (selectedTag) { selectedTag.classList.remove('selected'); selectedTag = null; }
+          const word = e.dataTransfer.getData('text/plain');
+          const tagElement = poolDiv.querySelector(`[data-word="${word}"]`);
+          if (tagElement) {
+            if (answers[idx]) poolDiv.appendChild(createTag(answers[idx]));
+            answers[idx] = word;
+            dropZone.textContent = word;
+            dropZone.classList.add('filled');
+            tagElement.remove();
+          }
+        });
+        dropZone.addEventListener('click', () => placeOrClear(idx, dropZone));
+        dropZone.addEventListener('keydown', (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); placeOrClear(idx, dropZone); } });
+      });
+
+      const words = ex.items.map((item) => item.word).sort(() => Math.random() - 0.5);
+      words.forEach((word) => poolDiv.appendChild(createTag(word)));
+
+      const resultEl = container.querySelector('#ex-tags-result');
+
+      btnCheck.style.display = 'block';
+      // Correction strictement locale : l'eleve doit replacer LE mot attendu, il n'y a pas de
+      // second avis Claude ici (les etiquettes sont fournies, il n'y a pas de synonyme a juger).
+      btnCheck.onclick = () => {
+        // Le verdict de la tentative precedente ne doit pas rester a l'ecran pendant
+        // qu'on recalcule : sinon l'eleve lit un pourcentage qui n'est plus le sien.
+        resultEl.style.display = 'none';
+        resultEl.innerHTML = '';
+        let correctCount = 0;
+
+        ex.items.forEach((item, idx) => {
+          const zone = container.querySelector(`.drop-zone[data-idx="${idx}"]`);
+          if (!zone) return;
+          zone.classList.remove('correct', 'error');
+          if (answers[idx] === item.word) {
+            zone.classList.add('correct');
+            correctCount++;
+          } else {
+            zone.classList.add('error');
+          }
+        });
+
+        const accuracy = totalItems > 0 ? correctCount / totalItems : 1;
+
+        if (accuracy >= 0.7) {
+          btnNext.style.display = 'block';
+          markCompleted();
+          btnCheck.style.display = 'none';
+          resultEl.style.display = 'none';
+          resultEl.innerHTML = '';
+        } else {
+          setTimeout(() => {
+            container.querySelectorAll('.drop-zone.error').forEach((z) => z.classList.remove('error'));
+          }, 2000);
+
+          resultEl.style.display = 'block';
+          resultEl.innerHTML = `
+            <p class="ex-score ex-score-fail">${Math.round(accuracy * 100)}% de bonnes réponses — il faut au moins 70% pour continuer.</p>
+            <button type="button" class="btn-secondary ex-regenerate-btn">✨ Régénérer l'exercice</button>
+          `;
+          resultEl.querySelector('.ex-regenerate-btn').onclick = () => { if (regenerateExercise) regenerateExercise(); };
+        }
+      };
+    }
+
+    // ============================================================
+    // Exercice 2 — Famille de mots
+    // ============================================================
+
+    function renderExFamily(ex, container, btnCheck, btnNext, markCompleted) {
+      container.innerHTML = `
+        <div class="families-list" id="ex-families"></div>
+        <p class="hint" id="ex-family-hint">Clique sur chaque carte pour la retourner et tester tes connaissances, puis clique sur « Vérifier ».</p>
+        <div class="ex-result" id="ex-family-result" style="display:none;"></div>
+      `;
+
+      const familiesDiv = container.querySelector('#ex-families');
+      const hintEl = container.querySelector('#ex-family-hint');
+      const resultEl = container.querySelector('#ex-family-result');
+      const totalCards = ex.items.length;
+      const flippedOnce = new Set();
+
+      btnCheck.style.display = 'none';
+      btnNext.style.display = 'none';
+
+      ex.items.forEach((item, cardIdx) => {
+        const mainWord = item.mainWord || item.word || 'Mot';
+        const card = document.createElement('div');
+        card.className = 'family-card';
+        card.dataset.idx = cardIdx;
+        card.innerHTML = `
+          <div class="family-card-inner">
+            <div class="family-card-front" role="button" tabindex="0" aria-label="Retourner la carte pour tester mes connaissances">
+              <div class="family-main-word">${mainWord}</div>
+              <div class="family-related">${item.related.map((w) => `<span class="related-tag" data-word="${w}">${w}</span>`).join('')}</div>
+            </div>
+            <div class="family-card-back">
+              <div class="family-main-word">${mainWord}</div>
+              <div class="family-inputs">${item.related.map((w, i) => `<input type="text" class="family-input" placeholder="Mot lié ${i + 1}" autocomplete="off">`).join('')}</div>
+            </div>
+          </div>
+        `;
+        familiesDiv.appendChild(card);
+
+        // Plus de bouton 🔄 : c'est la carte elle-meme qui se retourne au clic. Au verso,
+        // les champs de saisie doivent evidemment rester utilisables sans replier la carte.
+        const flipToBack = () => {
+          card.classList.add('flipped');
+          flippedOnce.add(cardIdx);
+          if (flippedOnce.size === totalCards) {
+            hintEl.style.display = 'none';
+            btnCheck.style.display = 'block';
+          }
+        };
+
+        const front = card.querySelector('.family-card-front');
+        front.addEventListener('click', flipToBack);
+        front.addEventListener('keydown', (e) => {
+          if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); flipToBack(); }
+        });
+
+        card.querySelector('.family-card-back').addEventListener('click', (e) => {
+          if (e.target.closest('.family-input')) return;
+          card.classList.remove('flipped');
+        });
+      });
+
+      const familyTranslationCache = new Map();
+      familiesDiv.querySelectorAll('.related-tag').forEach((tag) => {
+        tag.addEventListener('mouseenter', () => {
+          const word = tag.dataset.word;
+          const show = (translation) => {
+            if (!translation || !tag.matches(':hover') || tag.querySelector('.related-tag-translation')) return;
+            const bubble = document.createElement('span');
+            bubble.className = 'related-tag-translation';
+            bubble.textContent = translation;
+            tag.appendChild(bubble);
+          };
+          if (familyTranslationCache.has(word)) { show(familyTranslationCache.get(word)); return; }
+          google.script.run
+            .withSuccessHandler((translation) => { familyTranslationCache.set(word, translation); show(translation); })
+            .withFailureHandler(() => { familyTranslationCache.set(word, null); })
+            .translateText(word, 'auto', exTargetLang);
+        });
+        tag.addEventListener('mouseleave', () => {
+          const bubble = tag.querySelector('.related-tag-translation');
+          if (bubble) bubble.remove();
+        });
+      });
+
+      btnCheck.onclick = () => {
+        let totalWords = 0, correctWords = 0;
+        familiesDiv.querySelectorAll('.family-card').forEach((card) => {
+          const item = ex.items[parseInt(card.dataset.idx, 10)];
+          const expected = item.related.map((w) => wordMatchKey(w));
+          card.querySelectorAll('.family-input').forEach((input) => {
+            totalWords++;
+            input.classList.remove('correct', 'incorrect');
+            const value = input.value ? wordMatchKey(input.value) : '';
+            const matchIdx = value ? expected.indexOf(value) : -1;
+            if (matchIdx !== -1) {
+              correctWords++;
+              expected.splice(matchIdx, 1);
+              input.classList.add('correct');
+            } else {
+              input.classList.add('incorrect');
+            }
+          });
+        });
+
+        const requiredWords = Math.min(2, totalWords);
+        const passed = correctWords >= requiredWords;
+        resultEl.style.display = 'block';
+
+        if (passed) {
+          btnNext.style.display = 'block';
+          markCompleted();
+          resultEl.innerHTML = `<p class="ex-score ex-score-success">Bravo ! ${correctWords} / ${totalWords} mots retrouvés — tu peux continuer.</p>`;
+        } else {
+          resultEl.innerHTML = `<p class="ex-score ex-score-fail">${correctWords} / ${totalWords} mots retrouvés — trouve au moins ${requiredWords} mots pour continuer.</p>`;
+        }
+      };
+    }
+
+    // ============================================================
+    // Exercice 6 — Défi (texte à trous)
+    // ============================================================
+
+    function renderExCloze(ex, container, btnCheck, btnNext, hintIndices, markCompleted, keptAnswers) {
+      hintIndices = hintIndices || new Set();
+      keptAnswers = keptAnswers || {};
+      container.innerHTML = `
+        <div class="cloze-items" id="ex-cloze-list"></div>
+        <div class="ex-result" id="ex-cloze-result" style="display:none;"></div>
+      `;
+
+      const listDiv = container.querySelector('#ex-cloze-list');
+      const resultEl = container.querySelector('#ex-cloze-result');
+
+      ex.items.forEach((item, idx) => {
+        const div = document.createElement('div');
+        div.className = 'cloze-item';
+        const hint = hintIndices.has(idx) ? ` placeholder="${getFirstSyllableHint(item.answer)}…"` : '';
+        const html = item.text.replace('___', `<input type="text" class="cloze-input" data-idx="${idx}" autocomplete="off"${hint}>`);
+        div.innerHTML = `<span class="tags-bullet">${idx + 1}</span> <span>${html}</span>`;
+        listDiv.appendChild(div);
+
+        // Réponses déjà justes : pré-remplies et verrouillées plutôt que remises à zéro —
+        // l'élève ne refait que ce qu'il a raté. Valeur posée via le DOM (pas dans la chaîne
+        // HTML) pour ne pas casser l'attribut si la réponse contient une apostrophe.
+        if (keptAnswers[idx] !== undefined) {
+          const keptInput = div.querySelector('.cloze-input');
+          if (keptInput) {
+            keptInput.value = keptAnswers[idx];
+            keptInput.classList.add('correct');
+            keptInput.readOnly = true;
+          }
+        }
+      });
+
+      btnCheck.style.display = 'block';
+      btnNext.style.display = 'none';
+      btnCheck.onclick = () => {
+        let correctCount = 0;
+        const wrongIndices = new Set();
+        const keptForRetry = Object.assign({}, keptAnswers);
+        ex.items.forEach((item, idx) => {
+          const input = container.querySelector(`.cloze-input[data-idx="${idx}"]`);
+          if (!input) return;
+          if (input.value.trim().toLowerCase() === item.answer.toLowerCase()) {
+            input.classList.add('correct');
+            correctCount++;
+            keptForRetry[idx] = input.value.trim();
+          } else {
+            input.classList.add('error');
+            wrongIndices.add(idx);
+          }
+        });
+
+        const accuracy = ex.items.length > 0 ? correctCount / ex.items.length : 1;
+
+        if (accuracy >= 0.7) {
+          btnNext.style.display = 'block';
+          markCompleted();
+          btnCheck.style.display = 'none';
+          resultEl.style.display = 'none';
+          resultEl.innerHTML = '';
+        } else {
+          setTimeout(() => {
+            container.querySelectorAll('.cloze-input.error').forEach((i) => i.classList.remove('error'));
+          }, 2000);
+
+          resultEl.style.display = 'block';
+          resultEl.innerHTML = `
+            <p class="ex-score ex-score-fail">${Math.round(accuracy * 100)}% de bonnes réponses — il faut au moins 70% pour continuer.</p>
+            <button type="button" class="btn-secondary ex-retry-btn">💡 Recommencer avec indice</button>
+          `;
+          resultEl.querySelector('.ex-retry-btn').onclick = () => {
+            renderExCloze(ex, container, btnCheck, btnNext, wrongIndices, markCompleted, keptForRetry);
+          };
+        }
+      };
+    }
+
+    // ============================================================
+    // Exercice 7 — Phrase avec le vocabulaire
+    // ============================================================
+
+    function renderExSentence(ex, container, btnCheck, btnNext, markCompleted) {
+      const required = Math.max(1, Math.ceil(ex.words.length / 2));
+      container.innerHTML = `
+        <div class="sentence-exercise">
+          <div class="tags-pool" id="ex-sentence-words">
+            ${ex.words.map((w) => `<span class="tag-item sentence-word-chip" data-word="${escapeHtml(w)}">${escapeHtml(w)}</span>`).join('')}
+          </div>
+          <textarea class="sentence-textarea" id="ex-sentence-input" rows="3" placeholder="Écris ta phrase ici…" autocomplete="off"></textarea>
+          <p class="sentence-counter" id="ex-sentence-counter"></p>
+        </div>
+        <div class="ex-result" id="ex-sentence-result" style="display:none;"></div>
+      `;
+
+      const textarea = container.querySelector('#ex-sentence-input');
+      const counterEl = container.querySelector('#ex-sentence-counter');
+      const resultEl = container.querySelector('#ex-sentence-result');
+      const chips = Array.from(container.querySelectorAll('.sentence-word-chip'));
+
+      const updateUsedWords = () => {
+        const sentenceWords = extractSentenceWords(textarea.value);
+        const used = ex.words.filter((w) => sentenceWords.some((sw) => sameVocabularyWord(sw, w)));
+        const usedSet = new Set(used);
+        chips.forEach((chip) => chip.classList.toggle('used', usedSet.has(chip.dataset.word)));
+        counterEl.textContent = `${used.length} / ${ex.words.length} mots utilisés (il en faut au moins ${required})`;
+        return used;
+      };
+
+      textarea.addEventListener('input', updateUsedWords);
+      updateUsedWords();
+
+      btnCheck.style.display = 'block';
+      btnCheck.disabled = false;
+      btnCheck.textContent = 'Vérifier';
+      btnNext.style.display = 'none';
+
+      btnCheck.onclick = async () => {
+        const sentence = textarea.value.trim();
+        if (!sentence) {
+          resultEl.style.display = 'block';
+          resultEl.innerHTML = '<p class="ex-score ex-score-fail">Écris une phrase avant de vérifier.</p>';
+          return;
+        }
+
+        const used = updateUsedWords();
+        if (used.length < required) {
+          resultEl.style.display = 'block';
+          resultEl.innerHTML = `<p class="ex-score ex-score-fail">Tu utilises ${used.length} mot${used.length > 1 ? 's' : ''} sur ${ex.words.length} — il en faut au moins ${required}. Continue !</p>`;
+          return;
+        }
+
+        btnCheck.disabled = true;
+        btnCheck.textContent = 'Vérification...';
+        resultEl.style.display = 'block';
+        resultEl.innerHTML = '<p class="hint">Claude relit ta phrase…</p>';
+
+        try {
+          const verdict = await callCF({ action: 'verify_sentence', sentence, words: used });
+          const wordsFeedback = Array.isArray(verdict.wordsFeedback) ? verdict.wordsFeedback : [];
+          const allWordsCorrect = wordsFeedback.every((w) => w.correct);
+          const overallValid = !!verdict.sentenceValid && allWordsCorrect;
+
+          let html = '';
+          if (wordsFeedback.length) {
+            html += '<ul class="sentence-word-feedback-list">';
+            wordsFeedback.forEach((w) => {
+              const ok = !!w.correct;
+              html += `<li class="${ok ? 'sentence-word-feedback-ok' : 'sentence-word-feedback-bad'}"><strong>${escapeHtml(w.word || '')}</strong> ${ok ? '✅' : '❌'}${w.explanation ? ' — ' + escapeHtml(w.explanation) : ''}</li>`;
+            });
+            html += '</ul>';
+          }
+          html += `<p class="ex-score ${verdict.sentenceValid ? 'ex-score-success' : 'ex-score-fail'}">${escapeHtml(verdict.sentenceFeedback || (verdict.sentenceValid ? 'Bravo, ta phrase est correcte !' : 'Ta phrase contient une erreur.'))}</p>`;
+          if (!verdict.sentenceValid && verdict.correctedSentence) {
+            html += `<p class="sentence-corrected">✏️ ${escapeHtml(verdict.correctedSentence)}</p>`;
+          }
+          resultEl.innerHTML = html;
+
+          if (overallValid) {
+            btnNext.style.display = 'block';
+            markCompleted();
+            btnCheck.style.display = 'none';
+          } else {
+            btnCheck.disabled = false;
+            btnCheck.textContent = 'Vérifier';
+          }
+        } catch (error) {
+          resultEl.innerHTML = '<p class="ex-score ex-score-fail">Impossible de vérifier ta phrase pour le moment, réessaie.</p>';
+          btnCheck.disabled = false;
+          btnCheck.textContent = 'Vérifier';
+        }
+      };
+    }
+
+    // ============================================================
+    // Exercice 4 — Lecture (TTS + surbrillance + enregistrement)
+    // ============================================================
+
+    let isReadingAloud = false;
+    let isReadingPaused = false;
+    let readingSpokenIndex = -1;
+    let readingWordsData = null;
+    let readingFullTextWordsData = null;
+    let readingFallbackTimer = null;
+    let readingEndFallbackTimer = null;
+    let readingRevealTimeout = null;
+    let currentReadingPlayBtn = null;
+    let onReadingFinishedOnce = null;
+    let readingRate = 1;
+
+    function splitIntoSentences(text) {
+      const matches = text.match(/[^.!?…]+[.!?…]+(\s+|$)|[^.!?…]+$/g) || [text];
+      return matches.map((s) => s.trim()).filter(Boolean);
+    }
+
+    function buildReadingWordSpans(text) {
+      const parenRanges = [];
+      const parenRegex = /\([^)]*\)/g;
+      let parenMatch;
+      while ((parenMatch = parenRegex.exec(text)) !== null) parenRanges.push([parenMatch.index, parenMatch.index + parenMatch[0].length]);
+      const isInParens = (pos) => parenRanges.some(([start, end]) => pos >= start && pos < end);
+
+      const regex = /[\p{L}\p{M}'’-]+/gu;
+      let html = '';
+      let lastIndex = 0;
+      let match;
+      const words = [];
+      while ((match = regex.exec(text)) !== null) {
+        const start = match.index;
+        const end = start + match[0].length;
+        const spoken = !isInParens(start);
+        html += escapeHtml(text.slice(lastIndex, start));
+        html += `<span class="reading-word${spoken ? '' : ' reading-word-translation'}">${escapeHtml(match[0])}</span>`;
+        words.push({ start, end, text: match[0], spoken });
+        lastIndex = end;
+      }
+      html += escapeHtml(text.slice(lastIndex));
+      return { html, words };
+    }
+
+    function computeSpokenTextOffsets(spokenText) {
+      const regex = /[\p{L}\p{M}'’-]+/gu;
+      const offsets = [];
+      let match;
+      while ((match = regex.exec(spokenText)) !== null) offsets.push({ start: match.index, end: match.index + match[0].length });
+      return offsets;
+    }
+
+    function attachReadingWordTranslation(container) {
+      const translationCache = new Map();
+      container.querySelectorAll('.reading-word:not(.reading-word-translation)').forEach((wordEl) => {
+        wordEl.addEventListener('click', () => {
+          const existing = wordEl.querySelector('.daspalecte-translation-bubble');
+          if (existing) { existing.remove(); return; }
+          container.querySelectorAll('.daspalecte-translation-bubble').forEach((b) => b.remove());
+
+          const word = wordEl.textContent;
+          const show = (translation) => {
+            if (!translation) return;
+            const bubble = document.createElement('span');
+            bubble.className = 'daspalecte-translation-bubble';
+            bubble.textContent = translation;
+            wordEl.appendChild(bubble);
+          };
+          if (translationCache.has(word)) { show(translationCache.get(word)); return; }
+          google.script.run
+            .withSuccessHandler((translation) => { translationCache.set(word, translation); show(translation); })
+            .withFailureHandler(() => { translationCache.set(word, null); })
+            .translateText(word, 'auto', exTargetLang);
+        });
+      });
+      container.addEventListener('click', (e) => {
+        if (e.target.closest('.reading-word')) return;
+        container.querySelectorAll('.daspalecte-translation-bubble').forEach((b) => b.remove());
+      });
+    }
+
+    // Estimation grossiere de la duree de prononciation d'un mot (calee sur ~175 mots/minute
+    // a vitesse 1x) : approximation sans retour reel de la voix, ne peut pas etre parfaite.
+    function estimateWordDurationMs(word) {
+      const baseMsPerWord = 60000 / (175 * readingRate);
+      const lengthFactor = Math.max(0.6, Math.min(2, word.length / 5));
+      return baseMsPerWord * lengthFactor;
+    }
+
+    // La surbrillance est pilotee par cette minuterie estimee (demarree immediatement), pas par
+    // les evenements 'boundary' de speechSynthesis : sur certaines voix ces evenements arrivent en
+    // retard sur la voix reelle. Les evenements 'boundary' restent utilises pour rattraper la
+    // minuterie en avant (voir advanceReadingHighlightToCharIndex), jamais pour la faire reculer.
+    function startReadingFallbackTimer() {
+      clearReadingFallbackTimer();
+      const scheduleNext = () => {
+        if (isReadingPaused) { readingFallbackTimer = setTimeout(scheduleNext, 150); return; }
+        advanceReadingHighlight();
+        if (!readingWordsData || readingSpokenIndex >= readingWordsData.length - 1) { readingFallbackTimer = null; return; }
+        const currentWord = readingWordsData[readingSpokenIndex];
+        const nextWord = readingWordsData[readingSpokenIndex + 1];
+        const pauseMs = currentWord && currentWord.pauseAfterMs ? currentWord.pauseAfterMs / readingRate : 0;
+        readingFallbackTimer = setTimeout(scheduleNext, estimateWordDurationMs(nextWord.text) + pauseMs);
+      };
+      scheduleNext();
+    }
+
+    function clearReadingFallbackTimer() {
+      if (readingFallbackTimer) { clearTimeout(readingFallbackTimer); readingFallbackTimer = null; }
+      if (readingEndFallbackTimer) { clearTimeout(readingEndFallbackTimer); readingEndFallbackTimer = null; }
+    }
+
+    // Filet de securite : si aucun evenement de fin n'arrive (voix qui ne le declenche jamais),
+    // on force la fin de lecture nous-memes peu apres avoir surligne le dernier mot.
+    function scheduleReadingEndFallback() {
+      if (readingEndFallbackTimer) clearTimeout(readingEndFallbackTimer);
+      const lastWord = readingWordsData[readingWordsData.length - 1];
+      const buffer = (lastWord ? estimateWordDurationMs(lastWord.text) : 600) + 900;
+      readingEndFallbackTimer = setTimeout(() => {
+        readingEndFallbackTimer = null;
+        if (isReadingAloud) finishReadingAloud();
+      }, buffer);
+    }
+
+    function advanceReadingHighlight() {
+      if (!readingWordsData || !readingWordsData.length) return;
+      readingSpokenIndex++;
+      clearReadingHighlight();
+      const word = readingWordsData[readingSpokenIndex];
+      if (word && word.element) {
+        word.element.classList.add('reading-word-active');
+        word.element.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+      }
+      if (readingSpokenIndex >= readingWordsData.length - 1) scheduleReadingEndFallback();
+    }
+
+    function clearReadingHighlight() {
+      if (!readingWordsData) return;
+      readingWordsData.forEach((w) => w.element.classList.remove('reading-word-active'));
+    }
+
+    // Rattrapage : ne fait avancer la surbrillance que si le moteur TTS est deja plus avance que
+    // la minuterie estimee, ne la fait jamais reculer (ces evenements peuvent arriver apres coup).
+    function advanceReadingHighlightToCharIndex(charIndex) {
+      if (!readingWordsData || !readingWordsData.length) return;
+      let idx = readingWordsData.findIndex((w) => w.spokenStart !== undefined && w.spokenStart > charIndex);
+      idx = idx === -1 ? readingWordsData.length - 1 : Math.max(0, idx - 1);
+      if (idx <= readingSpokenIndex) return;
+      readingSpokenIndex = idx;
+      clearReadingHighlight();
+      const word = readingWordsData[idx];
+      if (word && word.element) {
+        word.element.classList.add('reading-word-active');
+        word.element.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+      }
+      if (idx >= readingWordsData.length - 1) scheduleReadingEndFallback();
+    }
+
+    function finishReadingAloud() {
+      isReadingAloud = false;
+      isReadingPaused = false;
+      clearReadingFallbackTimer();
+      clearReadingHighlight();
+      refreshReadingPlayButton();
+      if (onReadingFinishedOnce) onReadingFinishedOnce();
+    }
+
+    function refreshReadingPlayButton() {
+      if (!currentReadingPlayBtn) return;
+      if (!isReadingAloud) currentReadingPlayBtn.textContent = '🔊';
+      else if (isReadingPaused) currentReadingPlayBtn.textContent = '▶';
+      else currentReadingPlayBtn.textContent = '⏸';
+    }
+
+    function startReadingTTS(text) {
+      isReadingAloud = true;
+      isReadingPaused = false;
+      readingSpokenIndex = -1;
+      clearReadingFallbackTimer();
+      clearReadingHighlight();
+
+      const spokenText = text.replace(/\([^)]*\)/g, ' ');
+      window.speechSynthesis.cancel();
+      const utter = new SpeechSynthesisUtterance(spokenText);
+      utter.lang = 'fr-FR';
+      utter.rate = readingRate;
+      utter.onboundary = (event) => {
+        if (typeof event.charIndex === 'number') advanceReadingHighlightToCharIndex(event.charIndex);
+      };
+      utter.onend = () => { if (isReadingAloud) finishReadingAloud(); };
+      utter.onerror = () => { if (isReadingAloud) finishReadingAloud(); };
+      window.speechSynthesis.speak(utter);
+
+      startReadingFallbackTimer();
+    }
+
+    function stopReadingTTS() {
+      isReadingAloud = false;
+      isReadingPaused = false;
+      clearReadingFallbackTimer();
+      clearReadingHighlight();
+      window.speechSynthesis.cancel();
+    }
+
+    function pauseReadingTTS() {
+      isReadingPaused = true;
+      window.speechSynthesis.pause();
+    }
+
+    function resumeReadingTTS() {
+      isReadingPaused = false;
+      window.speechSynthesis.resume();
+    }
+
+    function stopReadingActivity() {
+      if (isReadingAloud) stopReadingTTS();
+      if (readingRevealTimeout) { clearTimeout(readingRevealTimeout); readingRevealTimeout = null; }
+      onReadingFinishedOnce = null;
+    }
+
+    function renderExReading(ex, container, btnCheck, btnNext, markCompleted) {
+      // Une ligne par phrase, chacune avec son propre bouton d'ecoute : la derive de l'estimation
+      // repart de zero a chaque phrase plutot que de s'accumuler sur tout le texte.
+      const sentences = splitIntoSentences(ex.text);
+
+      const sentenceHtml = sentences.map((sentenceText, idx) => {
+        const { html } = buildReadingWordSpans(sentenceText);
+        return `
+          <div class="reading-sentence" data-idx="${idx}">
+            <button type="button" class="reading-sentence-play" data-idx="${idx}" aria-label="Écouter cette phrase" style="visibility:hidden;">🔊</button>
+            <span class="reading-sentence-content">${html}</span>
+          </div>
+        `;
+      }).join('');
+
+      container.innerHTML = `
+        <div class="reading-text" id="ex-reading-text">${sentenceHtml}</div>
+        <div class="reading-toolbar" id="ex-reading-toolbar" style="display:none;">
+          <span>🔊 Clique sur une phrase pour l'écouter</span>
+          <button type="button" class="reading-speed-btn" data-dir="-1" title="Ralentir">🐢</button>
+          <span id="ex-reading-speed-value">${readingRate.toFixed(2)}x</span>
+          <button type="button" class="reading-speed-btn" data-dir="1" title="Accélérer">🐇</button>
+        </div>
+        <div id="ex-reading-record-stage" style="display:none;margin-top:10px;">
+          <button type="button" class="btn-secondary reading-record-btn">🎤 Enregistrer ma lecture</button>
+        </div>
+        <div class="reading-feedback" id="ex-reading-feedback" style="display:none;"></div>
+      `;
+
+      attachReadingWordTranslation(container);
+
+      const sentenceData = [];
+      const fullTextWordsData = [];
+      container.querySelectorAll('.reading-sentence').forEach((sentenceEl, idx) => {
+        const sentenceText = sentences[idx];
+        const { words } = buildReadingWordSpans(sentenceText);
+        const spans = sentenceEl.querySelectorAll('.reading-word');
+        const wordsWithEl = words.map((w, i) => ({ ...w, element: spans[i] })).filter((w) => w.spoken);
+
+        const spokenText = sentenceText.replace(/\([^)]*\)/g, ' ');
+        const spokenOffsets = computeSpokenTextOffsets(spokenText);
+        wordsWithEl.forEach((w, i) => { if (spokenOffsets[i]) { w.spokenStart = spokenOffsets[i].start; w.spokenEnd = spokenOffsets[i].end; } });
+        wordsWithEl.forEach((w, i) => {
+          if (w.spokenEnd === undefined) { w.pauseAfterMs = 0; return; }
+          const nextStart = wordsWithEl[i + 1] ? wordsWithEl[i + 1].spokenStart : spokenText.length;
+          const between = spokenText.slice(w.spokenEnd, nextStart);
+          if (/[.!?…]/.test(between)) w.pauseAfterMs = 450;
+          else if (/[,;:]/.test(between)) w.pauseAfterMs = 200;
+          else w.pauseAfterMs = 0;
+        });
+
+        sentenceData.push({ text: sentenceText, wordsData: wordsWithEl, playBtn: sentenceEl.querySelector('.reading-sentence-play') });
+        fullTextWordsData.push(...wordsWithEl);
+      });
+
+      // Reference utilisee uniquement par l'alignement de l'enregistrement final (texte entier).
+      readingFullTextWordsData = fullTextWordsData;
+      readingWordsData = null;
+      isReadingAloud = false;
+      isReadingPaused = false;
+      currentReadingPlayBtn = null;
+      let hasListenedToReading = false;
+
+      btnCheck.style.display = 'none';
+      btnNext.style.display = 'none';
+
+      const toolbarEl = container.querySelector('#ex-reading-toolbar');
+      const recordStage = container.querySelector('#ex-reading-record-stage');
+      const feedbackEl = container.querySelector('#ex-reading-feedback');
+
+      // Apres 20 secondes de lecture silencieuse, revele l'ecoute phrase par phrase.
+      readingRevealTimeout = setTimeout(() => {
+        toolbarEl.style.display = 'flex';
+        sentenceData.forEach((s) => { s.playBtn.style.visibility = 'visible'; });
+      }, 20000);
+
+      const playedSentences = new Set();
+      const checkAllSentencesPlayed = () => {
+        if (hasListenedToReading) return;
+        if (playedSentences.size < sentenceData.length) return;
+        hasListenedToReading = true;
+        recordStage.style.display = 'block';
+      };
+
+      const startSentencePlayback = (idx) => {
+        const s = sentenceData[idx];
+        if (!s) return;
+        if (isReadingAloud) stopReadingTTS();
+        readingWordsData = s.wordsData;
+        currentReadingPlayBtn = s.playBtn;
+        onReadingFinishedOnce = () => { playedSentences.add(idx); s.playBtn.classList.add('played'); checkAllSentencesPlayed(); };
+        startReadingTTS(s.text);
+        refreshReadingPlayButton();
+      };
+
+      sentenceData.forEach((s, idx) => {
+        s.playBtn.onclick = () => {
+          if (isReadingAloud && currentReadingPlayBtn === s.playBtn) {
+            if (isReadingPaused) resumeReadingTTS(); else pauseReadingTTS();
+            refreshReadingPlayButton();
+            return;
+          }
+          startSentencePlayback(idx);
+        };
+      });
+
+      container.querySelectorAll('.reading-speed-btn').forEach((btn) => {
+        btn.onclick = () => {
+          const dir = parseInt(btn.dataset.dir, 10);
+          readingRate = Math.max(0.5, Math.min(1.5, Math.round((readingRate + dir * 0.15) * 100) / 100));
+          container.querySelector('#ex-reading-speed-value').textContent = `${readingRate.toFixed(2)}x`;
+          if (isReadingAloud && currentReadingPlayBtn) {
+            const idx = sentenceData.findIndex((s) => s.playBtn === currentReadingPlayBtn);
+            if (idx !== -1) startSentencePlayback(idx);
+          }
+        };
+      });
+
+      const recordBtn = container.querySelector('.reading-record-btn');
+      recordBtn.onclick = () => {
+        // Texte affiche dans la fenetre d'enregistrement : sans les traductions entre
+        // parentheses, pour que l'eleve ne lise QUE ce qui sera compare a sa transcription.
+        const textToRead = ex.text.replace(/\([^)]*\)/g, ' ').replace(/\s+/g, ' ').trim();
+        openReadingRecordingWindow(readingFullTextWordsData, feedbackEl, textToRead, () => {
+          btnNext.style.display = 'block';
+          markCompleted();
+        });
+      };
+    }
+
+    // Une URL blob: (premiere version) generee depuis ce dialogue s'est averee ne pas etre un
+    // contexte securise aux yeux de Chrome (icone "connexion non securisee" en test reel), et
+    // SpeechRecognition/getUserMedia refusent d'y fonctionner, silencieusement — sans meme
+    // proposer la demande de permission micro. L'enregistrement ouvre donc desormais une vraie
+    // page servie par le deploiement "Application Web" de ce projet (Recording.html, via
+    // Code.gs:doGet()/getRecordingPageUrl()) : URL https://script.google.com/... normale,
+    // contexte securise garanti. Cette page etant sur une autre origine que ce dialogue,
+    // impossible d'en piloter le DOM directement (contrairement au Blob) : le resultat brut
+    // (transcription) revient par window.opener.postMessage(), et c'est ICI que se fait
+    // l'alignement (ce dialogue connait deja les mots de reference).
+    let recordingPageUrl = null;
+
+    function normalizeRecordedWord(word) {
+      return word.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[^a-z0-9']/g, '');
+    }
+
+    // Plus longue sous-sequence commune, comme dans content.js : alignement tolerant a l'ordre
+    // et aux mots manquants/en trop de la reconnaissance vocale.
+    function alignRecordedWords(refWords, recWords) {
+      const ref = refWords.map(normalizeRecordedWord);
+      const rec = recWords.map(normalizeRecordedWord);
+      const m = ref.length, n = rec.length;
+      const dp = [];
+      for (let i = 0; i <= m; i++) dp.push(new Array(n + 1).fill(0));
+      for (let i = 1; i <= m; i++) {
+        for (let j = 1; j <= n; j++) {
+          dp[i][j] = (ref[i - 1] && ref[i - 1] === rec[j - 1])
+            ? dp[i - 1][j - 1] + 1
+            : Math.max(dp[i - 1][j], dp[i][j - 1]);
+        }
+      }
+      const matched = new Array(m).fill(false);
+      let i = m, j = n;
+      while (i > 0 && j > 0) {
+        if (ref[i - 1] && ref[i - 1] === rec[j - 1]) { matched[i - 1] = true; i--; j--; }
+        else if (dp[i - 1][j] >= dp[i][j - 1]) i--;
+        else j--;
+      }
+      return matched;
+    }
+
+    function openReadingRecordingWindow(wordsData, feedbackEl, textToRead, onComplete) {
+      const referenceWords = wordsData.map((w) => w.text);
+
+      if (!recordingPageUrl) {
+        feedbackEl.style.display = 'block';
+        feedbackEl.textContent = "Enregistrement indisponible, réessaie dans quelques secondes.";
+        return;
+      }
+
+      // Le texte a lire voyage dans l'URL : la fenetre est sur une autre origine (Cloud
+      // Function) et les deux canaux de retour se sont averes fragiles dans l'autre sens, donc
+      // autant tout donner des l'ouverture. Garde-fou de longueur : au-dela, on ouvre sans le
+      // texte plutot que de risquer une URL rejetee (les textes de l'exercice Lecture sont
+      // courts, ce cas ne devrait pas se produire).
+      let url = recordingPageUrl;
+      if (textToRead) {
+        const withText = url + '&text=' + encodeURIComponent(textToRead);
+        if (withText.length < 6000) url = withText;
+      }
+
+      const win = window.open(url, 'daspalecte-recording', 'width=580,height=620');
+      if (!win) {
+        feedbackEl.style.display = 'block';
+        feedbackEl.textContent = "Impossible d'ouvrir la fenêtre d'enregistrement (bloqueur de popup ?).";
+        return;
+      }
+
+      feedbackEl.style.display = 'block';
+      feedbackEl.textContent = 'En attente de ta lecture dans la fenêtre ouverte...';
+
+      // Deux canaux de retour concurrents, le premier recu gagne (settled) :
+      // 1. polling de CacheService via google.script.run (la page d'enregistrement y depose
+      //    son resultat par fetch vers le deploiement Web App — fiable mais depend des
+      //    cookies de session dans un fetch cross-origin no-cors) ;
+      // 2. postMessage direct depuis la fenetre (la page tourne desormais sur le Cloud
+      //    Function, plus dans l'infrastructure Apps Script, donc ce canal peut fonctionner —
+      //    filet de securite si le fetch du canal 1 est rejete).
+      let settled = false;
+
+      const applyResult = (data) => {
+        if (settled) return;
+        settled = true;
+        clearInterval(pollInterval);
+        window.removeEventListener('message', handleMessage);
+        if (data.type === 'result') {
+          const recognizedWords = (data.transcript || '').trim().split(/\s+/).filter(Boolean);
+          const matched = alignRecordedWords(referenceWords, recognizedWords);
+          wordsData.forEach((w, idx) => {
+            w.element.classList.remove('reading-correct', 'reading-incorrect');
+            w.element.classList.add(matched[idx] ? 'reading-correct' : 'reading-incorrect');
+          });
+          const correctCount = matched.filter(Boolean).length;
+          feedbackEl.textContent = `${correctCount} / ${referenceWords.length} mots bien reconnus`;
+          if (onComplete) onComplete();
+        } else {
+          feedbackEl.textContent = data.message || 'Erreur de reconnaissance vocale.';
+        }
+      };
+
+      const handleMessage = (event) => {
+        if (!event.data || event.data.source !== 'daspalecte-recording' || !event.data.params) return;
+        const params = new URLSearchParams(event.data.params);
+        if (params.has('transcript')) {
+          applyResult({ type: 'result', transcript: params.get('transcript') });
+        } else if (params.has('error')) {
+          applyResult({ type: 'error', message: params.get('error') });
+        }
+      };
+      window.addEventListener('message', handleMessage);
+
+      const pollInterval = setInterval(() => {
+        if (win.closed && settled) {
+          clearInterval(pollInterval);
+          return;
+        }
+        google.script.run
+          .withSuccessHandler((data) => {
+            if (!data) {
+              // Continue de sonder un peu apres fermeture de la fenetre : le fetch de depot
+              // peut arriver au serveur juste avant que l'eleve ne ferme.
+              if (win.closed) clearInterval(pollInterval);
+              return;
+            }
+            applyResult(data);
+          })
+          .pollRecordingResult();
+      }, 1500);
+    }
+  </script>
+</body>
+</html>
