@@ -25,5 +25,7 @@ export function middleware() {
 export const config = {
   // Inutile sur les fichiers statiques : ils ne servent pas de contexte de
   // navigation et le middleware coute une invocation.
-  matcher: ["/((?!_next/static|_next/image|favicon.ico).*)"],
+  // Exclure aussi `/__/auth/*` : c'est le proxy Firebase (rewrites) — ne pas
+  // y injecter nos en-tetes COOP, le handler Firebase a les siens.
+  matcher: ["/((?!_next/static|_next/image|favicon.ico|__/auth).*)"],
 };

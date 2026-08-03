@@ -1,8 +1,9 @@
 import "server-only";
 
 import { cookies } from "next/headers";
-import { adminAuth } from "@/lib/firebase/admin";
-import type { Role } from "@/lib/types";
+import { adminAuth, adminDb } from "@/lib/firebase/admin";
+import { googleSubOf } from "@/lib/auth/provision";
+import type { Role, UserDoc } from "@/lib/types";
 
 export const SESSION_COOKIE = "daspalecte_session";
 
@@ -32,16 +33,38 @@ export async function getCurrentUser(): Promise<CurrentUser | null> {
   try {
     const decoded = await adminAuth().verifySessionCookie(value, false);
     const role = decoded.role as Role | undefined;
-    const googleSub = decoded.gsub as string | undefined;
-    if (!role || !googleSub) return null;
+    const googleSub =
+      (decoded.gsub as string | undefined) ?? googleSubOf(decoded);
 
-    return {
-      uid: googleSub,
-      email: decoded.email ?? "",
-      displayName: (decoded.name as string | undefined) ?? decoded.email ?? "",
-      photoURL: (decoded.picture as string | undefined) ?? null,
-      role,
-    };
+    if (role && googleSub) {
+      return {
+        uid: googleSub,
+        email: decoded.email ?? "",
+        displayName: (decoded.name as string | undefined) ?? decoded.email ?? "",
+        photoURL: (decoded.picture as string | undefined) ?? null,
+        role,
+      };
+    }
+
+    // Cookie cree juste apres setCustomUserClaims : le jeton n'avait pas encore
+    // les claims. On lit le role dans Firestore plutot que de renvoyer null
+    // (ce qui forcerait une reconnexion).
+    if (googleSub) {
+      const snapshot = await adminDb().collection("users").doc(googleSub).get();
+      if (snapshot.exists) {
+        const data = snapshot.data() as UserDoc;
+        return {
+          uid: googleSub,
+          email: data.email || decoded.email || "",
+          displayName: data.displayName || decoded.email || "",
+          photoURL:
+            data.photoURL ?? (decoded.picture as string | undefined) ?? null,
+          role: data.role,
+        };
+      }
+    }
+
+    return null;
   } catch {
     // Cookie expire, revoque ou falsifie — on traite comme "pas connecte".
     return null;

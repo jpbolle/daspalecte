@@ -24,24 +24,22 @@ export async function signInWithGoogle(): Promise<SignInResult> {
     const credential = await signInWithPopup(auth, googleProvider());
     return openServerSession(credential.user);
   } catch (error) {
-    const code = (error as { code?: string }).code ?? "";
+    // Cas frequent sous App Hosting : Google a authentifie, mais IndexedDB /
+    // la persistance rate pendant la fermeture de la fenetre (« Database is
+    // closing/hidden »). Si currentUser est deja la, on continue.
+    const recovered = await recoverAuthenticatedUser(auth.currentUser);
+    if (recovered) return openServerSession(recovered);
 
-    // L'eleve a ferme la fenetre : ce n'est pas une panne, on n'insiste pas.
+    const code = (error as { code?: string }).code ?? "";
+    const message = (error as { message?: string }).message ?? "";
+
     if (code === "auth/popup-closed-by-user" || code === "auth/cancelled-popup-request") {
       return { status: "cancelled" };
     }
 
-    // Le code brut ne sert qu'au diagnostic : l'ecran, lui, affiche une phrase.
-    console.warn("[AUTH] la connexion par fenetre a echoue :", code, error);
+    console.warn("[AUTH] la connexion par fenetre a echoue :", code || message, error);
 
-    // Repli en redirection UNIQUEMENT si la fenetre n'a pas pu s'ouvrir.
-    //
-    // On ne generalise surtout pas ce repli : la redirection s'appuie sur du
-    // stockage inter-sites entre ce domaine et celui de Firebase Auth, que
-    // Chrome bloque. Elle echoue alors en silence — l'eleve se reconnecte,
-    // revient, et retombe sur l'ecran de connexion sans la moindre explication.
-    // Mieux vaut afficher l'erreur de la fenetre surgissante, qui est
-    // exploitable.
+    // Repli redirection uniquement si la fenetre n'a pas pu s'ouvrir.
     if (
       code === "auth/popup-blocked" ||
       code === "auth/operation-not-supported-in-environment"
@@ -56,6 +54,10 @@ export async function signInWithGoogle(): Promise<SignInResult> {
         console.warn("[AUTH] la redirection a echoue aussi :", fallbackCode, fallback);
         return { status: "error", message: fallbackCode || code };
       }
+    }
+
+    if (isPersistenceRace(message)) {
+      return { status: "error", message: "auth-persistence-race" };
     }
 
     return { status: "error", message: code || "sign_in_failed" };
@@ -106,10 +108,17 @@ export async function completeRedirectSignIn(
  *
  * Au tout premier login le serveur pose le role en custom claim : le jeton
  * qu'on vient d'obtenir ne le porte donc pas encore et le serveur repond 409.
- * On le rafraichit et on retente une seule fois.
+ * On force un rafraichissement, on attend un peu (propagation), et on retente.
  */
 async function openServerSession(user: User): Promise<SignInResult> {
-  for (let attempt = 0; attempt < 2; attempt += 1) {
+  const maxAttempts = 5;
+
+  for (let attempt = 0; attempt < maxAttempts; attempt += 1) {
+    if (attempt > 0) {
+      // Laisse a Firebase le temps de propager setCustomUserClaims.
+      await wait(250 * attempt);
+    }
+
     const idToken = await user.getIdToken(attempt > 0);
     const response = await fetch("/api/auth/session", {
       method: "POST",
@@ -143,4 +152,23 @@ async function openServerSession(user: User): Promise<SignInResult> {
 export async function signOutEverywhere(): Promise<void> {
   await fetch("/api/auth/session", { method: "DELETE" });
   await signOut(getClientAuth());
+}
+
+function isPersistenceRace(message: string): boolean {
+  return /database is closing|closing\/hidden|connection is closing/i.test(
+    message,
+  );
+}
+
+/** Attend un court instant, puis relit currentUser (parfois pose juste apres l'erreur). */
+async function recoverAuthenticatedUser(
+  immediate: User | null,
+): Promise<User | null> {
+  if (immediate) return immediate;
+  await wait(400);
+  return getClientAuth().currentUser;
+}
+
+function wait(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
 }

@@ -51,12 +51,10 @@ export async function POST(request: Request) {
     );
   }
 
-  // Le role vient d'etre pose : le jeton du client ne le porte pas encore.
-  // On refuse poliment et il rappelle avec un jeton rafraichi.
-  if (result.claimStale) {
-    return NextResponse.json({ error: "token_stale", retry: true }, { status: 409 });
-  }
-
+  // Meme si le jeton client n'a pas encore les custom claims (claimStale),
+  // on cree le cookie : getCurrentUser() retombe sur Firestore pour le role.
+  // Evite le ballet 409 / rafraichissement qui cassait la connexion juste
+  // apres la fermeture de la fenetre Google.
   const cookie = await createSessionCookie(idToken);
   const response = NextResponse.json({ role: result.role });
   response.cookies.set({

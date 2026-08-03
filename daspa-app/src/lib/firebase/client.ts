@@ -1,8 +1,10 @@
 import { getApp, getApps, initializeApp } from "firebase/app";
 import {
   GoogleAuthProvider,
+  browserLocalPersistence,
   connectAuthEmulator,
   getAuth,
+  initializeAuth,
   type Auth,
 } from "firebase/auth";
 import {
@@ -27,9 +29,24 @@ const app = getApps().length ? getApp() : initializeApp(firebaseConfig);
 let authInstance: Auth | null = null;
 let dbInstance: Firestore | null = null;
 
+/**
+ * Auth cote navigateur.
+ *
+ * Persistance en localStorage (pas IndexedDB) : sous App Hosting, la fenetre
+ * Google se ferme juste apres l'auth et IndexedDB rate souvent avec
+ * « Database is closing/hidden », ce qui fait echouer signInWithPopup alors
+ * que Google a deja authentifie l'utilisateur.
+ */
 export function getClientAuth(): Auth {
   if (!authInstance) {
-    authInstance = getAuth(app);
+    try {
+      authInstance = initializeAuth(app, {
+        persistence: browserLocalPersistence,
+      });
+    } catch {
+      // HMR / double init : Auth est deja attache a l'app.
+      authInstance = getAuth(app);
+    }
     if (useEmulators) {
       connectAuthEmulator(authInstance, "http://127.0.0.1:9099", {
         disableWarnings: true,

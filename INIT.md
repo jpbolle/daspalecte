@@ -330,6 +330,10 @@ Consequence voulue : **un eleve n'a pas besoin d'ouvrir l'app web.** Son premier
 2. **`firebase emulators:start` prend le projet actif du CLI, pas forcement celui du `.firebaserc`** : l'emulateur Auth tournait sous `lecturevive-cnd` et rejetait tous les jetons (`aud` incorrect). Le script `npm run emulators` force desormais `--project essai-27712`
 3. **Creer la base Firestore par l'API exige la facturation** ; par la console, le plan gratuit suffit
 4. **Un `w-full` dans un conteneur flex s'ecrase a zero** — la jauge de score etait invisible sur `/moi`
+5. **Connexion Google intermittente sous App Hosting (2026-08-03)** — deux causes cumulees dans les logs :
+   - IndexedDB rate a la fermeture de la fenetre Google (`Database is closing/hidden`) alors que l'auth a reussi → persistance basculee en `localStorage`, et si `signInWithPopup` leve quand meme, on reprend `auth.currentUser`
+   - Le premier login repondait `409` (custom claims pas encore sur le jeton) pendant que la fenetre se fermait → on cree le cookie malgre tout, et `getCurrentUser()` retombe sur Firestore pour le role. Les alertes COOP `window.closed` restent du bruit (origine Google), pas la cause.
+   - Suite possible : basculer `authDomain` sur le domaine App Hosting + proxy `/__/auth/*` (rewrite deja en place) apres avoir ajoute `https://daspalecte--essai-27712.europe-west4.hosted.app/__/auth/handler` aux URI de redirection du client OAuth
 
 ### Extension : envoi des resultats (`analytics.js`)
 

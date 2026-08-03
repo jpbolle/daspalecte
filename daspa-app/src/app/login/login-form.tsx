@@ -123,6 +123,9 @@ function describeError(code: string): string {
       return "Le navigateur a bloqué la connexion. Autorise les fenêtres surgissantes pour ce site, puis réessaie.";
     case "auth/popup-blocked":
       return "Ton navigateur a bloqué la fenêtre de connexion. Autorise-la pour ce site, puis réessaie.";
+    case "auth-persistence-race":
+    case "token_stale":
+      return "La connexion a presque réussi. Réessaie une fois — ça marche en général au second essai.";
     default:
       return "La connexion a échoué. Réessaie dans un instant.";
   }
