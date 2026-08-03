@@ -7,6 +7,27 @@ const nextConfig: NextConfig = {
   turbopack: {
     root: path.join(__dirname),
   },
+
+  async headers() {
+    return [
+      {
+        source: "/:path*",
+        headers: [
+          {
+            // App Hosting sert un COOP `same-origin` par defaut, ce qui coupe
+            // le lien entre la fenetre Google et la page : signInWithPopup ne
+            // recupere jamais son resultat et echoue sans code d'erreur.
+            // `same-origin-allow-popups` retablit ce seul lien, sans rouvrir
+            // la page aux autres origines.
+            key: "Cross-Origin-Opener-Policy",
+            value: "same-origin-allow-popups",
+          },
+          { key: "X-Content-Type-Options", value: "nosniff" },
+          { key: "Referrer-Policy", value: "strict-origin-when-cross-origin" },
+        ],
+      },
+    ];
+  },
 };
 
 export default nextConfig;

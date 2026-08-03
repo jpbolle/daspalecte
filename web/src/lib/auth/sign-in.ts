@@ -25,15 +25,32 @@ export async function signInWithGoogle(): Promise<SignInResult> {
     return openServerSession(credential.user);
   } catch (error) {
     const code = (error as { code?: string }).code ?? "";
-    if (code === "auth/popup-blocked" || code === "auth/operation-not-supported-in-environment") {
-      // Certains Chromebooks scolaires bloquent les popups par strategie.
-      await signInWithRedirect(auth, googleProvider());
-      return { status: "redirecting" };
-    }
+
+    // L'eleve a ferme la fenetre : ce n'est pas une panne, on n'insiste pas.
     if (code === "auth/popup-closed-by-user" || code === "auth/cancelled-popup-request") {
       return { status: "cancelled" };
     }
-    return { status: "error", message: code || "sign_in_failed" };
+
+    // Le code brut ne sert qu'au diagnostic : l'ecran, lui, affiche une phrase.
+    console.warn("[AUTH] la connexion par fenetre a echoue :", code, error);
+
+    // Certaines erreurs ne se rejouent pas : redemander par redirection
+    // enverrait l'eleve faire un aller-retour pour rien.
+    if (code === "auth/unauthorized-domain" || code === "auth/user-disabled") {
+      return { status: "error", message: code };
+    }
+
+    // Pour tout le reste, on bascule en redirection. La fenetre surgissante est
+    // fragile — bloquee par strategie sur certains Chromebooks, coupee de la
+    // page par les regles COOP — alors que la redirection traverse tout.
+    try {
+      await signInWithRedirect(auth, googleProvider());
+      return { status: "redirecting" };
+    } catch (fallback) {
+      const fallbackCode = (fallback as { code?: string }).code ?? "";
+      console.warn("[AUTH] la redirection a echoue aussi :", fallbackCode, fallback);
+      return { status: "error", message: fallbackCode || code || "sign_in_failed" };
+    }
   }
 }
 

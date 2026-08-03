@@ -10,9 +10,9 @@
  * par chrome.identity, et le serveur le verifie contre sa liste d'audiences.
  */
 
-// URL de l'app web. A basculer sur l'URL App Hosting une fois deployee ;
-// `daspalecteApiBase` dans chrome.storage.local prime, pour tester en local.
-const DEFAULT_API_BASE = 'http://127.0.0.1:3000';
+// URL de l'app web (Firebase App Hosting). Pour developper en local, poser
+// `daspalecteApiBase` dans chrome.storage.local : cette clef prime sur la constante.
+const DEFAULT_API_BASE = 'https://daspalecte--essai-27712.europe-west4.hosted.app';
 
 const QUEUE_KEY = 'daspalecteQueue';
 const SESSIONS_KEY = 'daspalecteSessions';

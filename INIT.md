@@ -347,6 +347,15 @@ Consequence voulue : **un eleve n'a pas besoin d'ouvrir l'app web.** Son premier
 - **`markCompleted(result)` n'enregistre que la premiere reussite** d'un exercice : un exercice deja reussi peut etre re-verifie, le prof verrait des doublons
 - Un compte non inscrit par un prof recoit un 403 `unknown_account` : le suivi se coupe (`daspalecteTrackingBlocked`) au lieu de rejouer indefiniment, et le sidepanel l'explique a l'eleve
 
+### Deploiement (2026-08-03)
+
+- **App en production** : `https://daspalecte--essai-27712.europe-west4.hosted.app` (Firebase App Hosting, backend `daspalecte`). `analytics.js` pointe dessus ; `daspalecteApiBase` dans `chrome.storage.local` permet de rebasculer en local sans toucher au code
+- **Region `europe-west4`** (Pays-Bas) : `europe-west1` n'existe pas chez App Hosting, la creation echoue en 403 « Location not found »
+- **Plan Blaze obligatoire** : sans lui, `firebaseapphosting.googleapis.com` ne peut meme pas s'activer
+- **Piege `EntityTooLarge` a l'envoi** : l'archive source est faite depuis la **racine du depot**, donc seules les regles du `.gitignore` racine s'y appliquent — celles de `web/.gitignore` sont ancrees a `web/` et ignorees. Sans `.next/` dans le `.gitignore` racine, l'envoi echoue avec un message XML que la CLI n'arrive meme pas a lire
+- **Archive extension** : `./package-extension.sh` produit `daspalecte-<version>.zip`. Il **refuse** de construire si `DEFAULT_API_BASE` est local, si `"key"` est revenue dans le manifeste, ou si un fichier JS a une erreur de syntaxe
+- **Alerte GitHub sur `NEXT_PUBLIC_FIREBASE_API_KEY`** : sans objet. Une cle Web Firebase identifie le projet, elle ne l'autorise pas ; ce sont les regles Firestore qui protegent. A restreindre malgre tout par API et par domaine referent dans la console Google Cloud
+
 ### Reste a faire
 
 - **Verifier le flux de bout en bout avec un vrai compte eleve.** Attention : `jeanphilippe.bolle@cnddinant.be` est provisionne en **admin**, donc `/api/ingest` repond `{ok: true, ignored: "not_a_student"}` — c'est la preuve que la chaine jeton + CORS + resolution de compte fonctionne, mais aucune donnee n'est ecrite. Il faut un compte inscrit comme eleve pour voir des sessions apparaitre

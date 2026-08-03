@@ -97,11 +97,31 @@ function Feedback({ result }: { result: SignInResult | null }) {
     );
   }
 
-  return (
-    <Message tone="danger">
-      La connexion a échoué ({result.message}). Réessaie dans un instant.
-    </Message>
-  );
+  return <Message tone="danger">{describeError(result.message)}</Message>;
+}
+
+/**
+ * Les codes de Firebase Auth ne veulent rien dire pour un élève qui apprend le
+ * français. On les traduit en une phrase qui indique quoi faire, et on garde le
+ * code brut dans la console pour le diagnostic.
+ */
+function describeError(code: string): string {
+  switch (code) {
+    case "auth/unauthorized-domain":
+      // Erreur de configuration, pas une erreur de l'élève : le domaine du site
+      // manque dans Firebase Auth → Paramètres → Domaines autorisés.
+      return "Le site n’est pas encore configuré pour la connexion. Préviens ton professeur.";
+    case "auth/network-request-failed":
+      return "Pas de connexion internet. Vérifie le réseau et réessaie.";
+    case "auth/user-disabled":
+      return "Ce compte a été désactivé.";
+    case "auth/too-many-requests":
+      return "Trop de tentatives. Attends une minute et réessaie.";
+    case "auth/internal-error":
+      return "Google n’a pas répondu correctement. Réessaie dans un instant.";
+    default:
+      return "La connexion a échoué. Réessaie dans un instant.";
+  }
 }
 
 function Message({
