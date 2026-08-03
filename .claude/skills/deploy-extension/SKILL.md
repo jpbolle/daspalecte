@@ -9,9 +9,9 @@ Quand l'utilisateur demande de deployer, packager, ou publier l'extension Daspal
 
 ### 1. Bump de version
 Demander le nouveau numero de version a l'utilisateur, puis mettre a jour :
-- `manifest.json` : champ `"version"`
-- `popup.html` : texte du footer `<p>2026 - version X.Y</p>`
-- `sidepanel.html` : texte du footer version
+- `daspa-extension/manifest.json` : champ `"version"`
+- `daspa-extension/popup.html` : texte du footer `<p>2026 - version X.Y</p>`
+- `daspa-extension/sidepanel.html` : texte du footer version
 - `INIT.md` : derniere ligne `## Version actuelle : X.Y`
 
 ### 2. Mise a jour de la description Chrome Web Store
@@ -41,32 +41,13 @@ Si des changements sont detectes, avertir l'utilisateur :
 Si aucun changement : indiquer que le Cloud Run n'a pas besoin d'etre mis a jour.
 
 ### 4. Creation du package ZIP
-Creer le zip pour le Chrome Web Store avec uniquement les fichiers necessaires :
+Preferer le script :
 ```bash
-cd /Users/jean-philippejpbolle/Documents/daspalecte && \
-rm -f daspalecte-extension.zip && \
-zip -r daspalecte-extension.zip \
-  manifest.json \
-  background.js \
-  content.js \
-  content.css \
-  popup.html \
-  popup.js \
-  popup.css \
-  sidepanel.html \
-  sidepanel.js \
-  sidepanel.css \
-  pdfviewer.html \
-  pdfviewer.js \
-  pdfviewer.css \
-  privacy-policy.html \
-  icon16.png \
-  icon32.png \
-  icon48.png \
-  icon128.png \
-  lib/pdf.min.mjs \
-  lib/pdf.worker.min.mjs
+./daspa-extension/package-extension.sh
 ```
+Il produit `daspa-extension/daspalecte-<version>.zip` et refuse de packager si
+`DEFAULT_API_BASE` est local, si `"key"` est dans le manifeste, ou si un JS a
+une erreur de syntaxe.
 
 Fichiers volontairement exclus du zip :
 - `.git/`, `.gitignore`, `.claude/`

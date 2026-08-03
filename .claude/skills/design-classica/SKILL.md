@@ -35,7 +35,7 @@ Le thème **Classica** est un style épuré, tons chauds, fond crème. À utilis
 
 ## Variables CSS à privilégier
 
-Toujours utiliser les variables `--t-*` définies dans `themes.css` :
+Toujours utiliser les variables `--t-*` définies dans `daspa-extension/themes.css` :
 
 ```css
 /* Bon */
@@ -47,7 +47,7 @@ border: 1px solid var(--t-border);
 color: #2d6a5a;
 ```
 
-## Styles inline (content.js)
+## Styles inline (daspa-extension/content.js)
 
 Pour les styles dynamiques, utiliser `getThemeColors()` qui retourne pour Classica :
 
@@ -85,6 +85,6 @@ Pour les styles dynamiques, utiliser `getThemeColors()` qui retourne pour Classi
 
 ## Fichiers de référence
 
-- `themes.css` — lignes 122–234 : définition complète des variables Classica
-- `content.js` — `getThemeColors()` lignes 41–56
-- `popup.css` — `.theme-preview-classica` pour exemples de composants
+- `daspa-extension/themes.css` — lignes 122–234 : définition complète des variables Classica
+- `daspa-extension/content.js` — `getThemeColors()` lignes 41–56
+- `daspa-extension/popup.css` — `.theme-preview-classica` pour exemples de composants

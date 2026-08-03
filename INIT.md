@@ -72,28 +72,25 @@ Les titres des exercices sont renumerotes automatiquement selon leur position re
 - Selecteur de langue maternelle
 - 3 boutons d'action : 🎨 Theme, 🗺️ Roadmap (overlay sur la page), ℹ️ Info (lien pedagokit.be)
 
-## Architecture
+## Architecture (monorepo)
 
 ```
-Extension Chrome (frontend)
-  ├── popup        → point d'entree, selection de langue, detection PDF, theme
-  ├── sidepanel    → panneau lateral avec toggles et liste de vocabulaire
-  ├── content.js   → injection dans les pages web (traduction, comprehension, exercices, roadmap)
-  ├── themes.css   → variables CSS pour les 2 themes (Cyberpunk + Classica)
-  ├── theme-manager.js → lit le theme depuis storage, applique data-theme sur :root
-  ├── pdfviewer    → visionneuse PDF (html/js/css) + pdf.js
-  └── background   → service worker, relay de messages, TTS (chrome.tts)
+daspa-extension/          → extension Chrome
+  ├── popup / sidepanel / content.js / pdfviewer / analytics.js
+  └── package-extension.sh
 
-Cloud Function (backend)
-  └── index.js     → recoit les requetes, appelle Claude API, renvoie JSON
+gas-addon/                → module Google Docs/Sheets/Slides (Apps Script)
+
+daspa-app/                → app web de resultats (Next.js + Firebase App Hosting)
+
+cloud-function/           → backend Claude (hors git) → Cloud Run europe-west1
+
+firestore.rules (+ indexes) → a la racine (partages avec daspa-app et les emulateurs)
 
 Google Cloud Console
   └── Projet "vocabulaire" (ID numerique : 1086562672385)
       ├── Cloud Run   → daspalecte (europe-west1)
       └── Secret Manager → "daspalecte" (cle API Anthropic)
-
-Google Apps Script (scores)
-  └── Web app deployee → recoit les scores des tests de lecture et les ecrit dans Google Sheets
 ```
 
 ## Flux de donnees
@@ -304,13 +301,13 @@ Repond a la roadmap #10 : equivalent de l'extension pour Google Docs/Sheets/Slid
 10. **Module complementaire equivalent pour Google Docs** — meme principe que l'extension (traduction au clic, aide a la comprehension, vocabulaire) mais adapte a Google Docs ; a verifier : l'editeur Docs ne rend pas le texte en DOM standard (canvas/SVG), donc probablement un Google Docs Add-on (Apps Script) plutot qu'une reutilisation directe de content.js
 11. **Connexion OAuth Google + plateforme web de resultats** — chantier prioritaire, decide en fin de session du 2026-08-01 (voir la section dediee ci-dessous). Absorbe et remplace les items #2 (envoi des resultats au prof), #3 (interface professeur) et #8 (connexion utilisateur), qui ne doivent plus etre traites separement
 
-## App web de resultats (`web/`) — chantier en cours, demarre le 2026-08-03
+## App web de resultats (`daspa-app/`) — chantier en cours, demarre le 2026-08-03
 
 Plan complet : `/Users/jpbolle/.claude/plans/crispy-dreaming-duckling.md`. Remplace le flux « score -> Apps Script -> Google Sheet » et absorbe les items #2, #3, #8 et #11 de la roadmap.
 
 - **Projet Firebase** : `essai-27712` (nom affiche « daspalecte »), reutilise faute de quota pour en creer un nouveau. **L'ID reste `essai-27712`** et apparaitra dans l'URL d'hebergement. Firestore en `eur3` (multi-region Europe, choisi a la creation, immuable), plan gratuit
-- **Stack** : Next.js 16 (App Router, TypeScript) + Tailwind v4 dans `web/`, deploiement prevu sur Firebase App Hosting (necessite le plan Blaze, pas encore active)
-- **Theme** : tokens Classica recopies de `themes.css:127-244` dans le bloc `@theme` de `web/src/app/globals.css`. **Si l'un bouge, l'autre suit.** Registre « product » du skill impeccable : Playfair reserve aux titres de page, jamais sur un libelle ou un bouton
+- **Stack** : Next.js 16 (App Router, TypeScript) + Tailwind v4 dans `daspa-app/`, deploiement Firebase App Hosting (`firebase.json` → `rootDir: daspa-app`)
+- **Theme** : tokens Classica recopies de `daspa-extension/themes.css:127-244` dans le bloc `@theme` de `daspa-app/src/app/globals.css`. **Si l'un bouge, l'autre suit.** Registre « product » du skill impeccable : Playfair reserve aux titres de page, jamais sur un libelle ou un bouton
 
 ### La decision structurante : la clef d'un compte est le `sub` Google
 
@@ -324,7 +321,7 @@ Consequence voulue : **un eleve n'a pas besoin d'ouvrir l'app web.** Son premier
 - Inscription par email : `/prof` pour les eleves, `/admin/profs` pour les profs (admin seul). `ADMIN_EMAIL` est promu admin a son premier login quoi qu'en dise son document `users` — filet anti-verrouillage
 - `POST /api/ingest` : verifie le token contre une **liste** d'audiences (`ALLOWED_AUDIENCES`, jamais un client ID en dur), ecriture idempotente (l'id d'evenement vient du client, un lot rejoue ne double pas les compteurs), projection vers `vocabulary` / `readingTests` / `exerciseResults`
 - Ecrans : tableau de classe avec stats + cartes eleves, fiche eleve avec ses sessions depliables (mots etudies, exercices et leurs scores, test de lecture), vue eleve (`/moi`) avec ses tests et ses mots filtrables
-- **31 tests** (`cd web && npm test`) : 21 sur les regles Firestore, 10 sur les ecritures d'ingestion. Les deux suites exigent l'emulateur Firestore, donc un JDK (`brew install openjdk`)
+- **31 tests** (`cd daspa-app && npm test`) : 21 sur les regles Firestore, 10 sur les ecritures d'ingestion. Les deux suites exigent l'emulateur Firestore, donc un JDK (`brew install openjdk`)
 - Regles et index deployes sur le projet reel
 
 ### Pieges rencontres
@@ -352,8 +349,9 @@ Consequence voulue : **un eleve n'a pas besoin d'ouvrir l'app web.** Son premier
 - **App en production** : `https://daspalecte--essai-27712.europe-west4.hosted.app` (Firebase App Hosting, backend `daspalecte`). `analytics.js` pointe dessus ; `daspalecteApiBase` dans `chrome.storage.local` permet de rebasculer en local sans toucher au code
 - **Region `europe-west4`** (Pays-Bas) : `europe-west1` n'existe pas chez App Hosting, la creation echoue en 403 « Location not found »
 - **Plan Blaze obligatoire** : sans lui, `firebaseapphosting.googleapis.com` ne peut meme pas s'activer
-- **Piege `EntityTooLarge` a l'envoi** : l'archive source est faite depuis la **racine du depot**, donc seules les regles du `.gitignore` racine s'y appliquent — celles de `web/.gitignore` sont ancrees a `web/` et ignorees. Sans `.next/` dans le `.gitignore` racine, l'envoi echoue avec un message XML que la CLI n'arrive meme pas a lire
-- **Archive extension** : `./package-extension.sh` produit `daspalecte-<version>.zip`. Il **refuse** de construire si `DEFAULT_API_BASE` est local, si `"key"` est revenue dans le manifeste, ou si un fichier JS a une erreur de syntaxe
+- **Piege `EntityTooLarge` a l'envoi** : l'archive source est faite depuis la **racine du depot**, donc seules les regles du `.gitignore` racine s'y appliquent — celles de `daspa-app/.gitignore` sont ancrees a `daspa-app/` et ignorees. Sans `.next/` dans le `.gitignore` racine, l'envoi echoue avec un message XML que la CLI n'arrive meme pas a lire
+- **Archive extension** : `./daspa-extension/package-extension.sh` produit `daspalecte-<version>.zip`. Il **refuse** de construire si `DEFAULT_API_BASE` est local, si `"key"` est revenue dans le manifeste, ou si un fichier JS a une erreur de syntaxe
+- **Reorganisation monorepo (2026-08-03)** : `web/` → `daspa-app/`, fichiers extension → `daspa-extension/`. Charger l'extension locale depuis `daspa-extension/` (le chemin absolu change → nouvel ID Chrome pour la copie non empaquetee)
 - **Alerte GitHub sur `NEXT_PUBLIC_FIREBASE_API_KEY`** : sans objet. Une cle Web Firebase identifie le projet, elle ne l'autorise pas ; ce sont les regles Firestore qui protegent. A restreindre malgre tout par API et par domaine referent dans la console Google Cloud
 
 ### Reste a faire

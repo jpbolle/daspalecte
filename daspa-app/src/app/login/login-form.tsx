@@ -119,6 +119,10 @@ function describeError(code: string): string {
       return "Trop de tentatives. Attends une minute et réessaie.";
     case "auth/internal-error":
       return "Google n’a pas répondu correctement. Réessaie dans un instant.";
+    case "redirect-sans-resultat":
+      return "Le navigateur a bloqué la connexion. Autorise les fenêtres surgissantes pour ce site, puis réessaie.";
+    case "auth/popup-blocked":
+      return "Ton navigateur a bloqué la fenêtre de connexion. Autorise-la pour ce site, puis réessaie.";
     default:
       return "La connexion a échoué. Réessaie dans un instant.";
   }

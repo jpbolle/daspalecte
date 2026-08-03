@@ -34,25 +34,36 @@ export async function signInWithGoogle(): Promise<SignInResult> {
     // Le code brut ne sert qu'au diagnostic : l'ecran, lui, affiche une phrase.
     console.warn("[AUTH] la connexion par fenetre a echoue :", code, error);
 
-    // Certaines erreurs ne se rejouent pas : redemander par redirection
-    // enverrait l'eleve faire un aller-retour pour rien.
-    if (code === "auth/unauthorized-domain" || code === "auth/user-disabled") {
-      return { status: "error", message: code };
+    // Repli en redirection UNIQUEMENT si la fenetre n'a pas pu s'ouvrir.
+    //
+    // On ne generalise surtout pas ce repli : la redirection s'appuie sur du
+    // stockage inter-sites entre ce domaine et celui de Firebase Auth, que
+    // Chrome bloque. Elle echoue alors en silence — l'eleve se reconnecte,
+    // revient, et retombe sur l'ecran de connexion sans la moindre explication.
+    // Mieux vaut afficher l'erreur de la fenetre surgissante, qui est
+    // exploitable.
+    if (
+      code === "auth/popup-blocked" ||
+      code === "auth/operation-not-supported-in-environment"
+    ) {
+      try {
+        sessionStorage.setItem(REDIRECT_FLAG, "1");
+        await signInWithRedirect(auth, googleProvider());
+        return { status: "redirecting" };
+      } catch (fallback) {
+        sessionStorage.removeItem(REDIRECT_FLAG);
+        const fallbackCode = (fallback as { code?: string }).code ?? "";
+        console.warn("[AUTH] la redirection a echoue aussi :", fallbackCode, fallback);
+        return { status: "error", message: fallbackCode || code };
+      }
     }
 
-    // Pour tout le reste, on bascule en redirection. La fenetre surgissante est
-    // fragile — bloquee par strategie sur certains Chromebooks, coupee de la
-    // page par les regles COOP — alors que la redirection traverse tout.
-    try {
-      await signInWithRedirect(auth, googleProvider());
-      return { status: "redirecting" };
-    } catch (fallback) {
-      const fallbackCode = (fallback as { code?: string }).code ?? "";
-      console.warn("[AUTH] la redirection a echoue aussi :", fallbackCode, fallback);
-      return { status: "error", message: fallbackCode || code || "sign_in_failed" };
-    }
+    return { status: "error", message: code || "sign_in_failed" };
   }
 }
+
+/** Marque qu'une redirection est en cours, pour reconnaitre un retour vide. */
+const REDIRECT_FLAG = "daspalecte-redirect-en-cours";
 
 /**
  * A appeler au chargement de la page de connexion, pour le retour de
@@ -68,7 +79,20 @@ export async function completeRedirectSignIn(
   const auth = getClientAuth();
   try {
     const credential = await getRedirectResult(auth);
-    if (!credential) return null;
+    if (!credential) {
+      // On etait parti en redirection et on revient les mains vides : le
+      // navigateur a bloque le stockage inter-sites dont ce flux depend. Sans
+      // ce cas, l'eleve retombait sur l'ecran de connexion sans un mot.
+      if (sessionStorage.getItem(REDIRECT_FLAG)) {
+        sessionStorage.removeItem(REDIRECT_FLAG);
+        console.warn(
+          "[AUTH] retour de redirection sans resultat (stockage inter-sites bloque)",
+        );
+        return { status: "error", message: "redirect-sans-resultat" };
+      }
+      return null;
+    }
+    sessionStorage.removeItem(REDIRECT_FLAG);
     onResumed?.();
     return openServerSession(credential.user);
   } catch (error) {

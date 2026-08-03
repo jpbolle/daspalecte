@@ -1,9 +1,9 @@
 @import "tailwindcss";
 
 /*
- * Thème Classica — miroir de themes.css de l'extension Daspalecte.
+ * Thème Classica — miroir de daspa-extension/themes.css.
  * Toute valeur ci-dessous vient du bloc :root[data-daspalecte-theme="classica"]
- * (themes.css:127-244). Ne pas diverger sans répercuter dans les deux sens.
+ * (daspa-extension/themes.css:127-244). Ne pas diverger sans répercuter dans les deux sens.
  */
 @theme {
   /* Couleurs */

@@ -102,17 +102,15 @@ npm install
 
 ```
 daspalecte/
-├── manifest.json              # Configuration de l'extension (MV3)
-├── background.js              # Service worker
-├── popup.html/js/css          # Interface popup (icône extension)
-├── sidepanel.html/js/css      # Panneau latéral d'outils
-├── content.js                 # Script principal (1,209 lignes)
-├── content.css                # Styles pour les traductions et UI
-├── icon*.png                  # Icônes de l'extension (16-128px)
-├── test-ligatures.html        # Page de test pour ligatures françaises
-└── cloud-function/            # Backend Google Cloud
-    ├── index.js               # Function Claude API
-    └── package.json           # Dépendances
+├── daspa-extension/           # Extension Chrome
+│   ├── manifest.json
+│   ├── content.js / popup / sidepanel / pdfviewer / analytics.js
+│   └── package-extension.sh
+├── gas-addon/                 # Module Docs/Sheets/Slides (Apps Script)
+├── daspa-app/                 # App web de résultats (Next.js + Firebase)
+├── cloud-function/            # Backend Claude (hors git)
+├── firestore.rules            # Règles Firestore (racine)
+└── firebase.json              # App Hosting rootDir → daspa-app
 ```
 
 ## Technologies utilisées

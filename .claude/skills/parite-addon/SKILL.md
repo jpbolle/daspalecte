@@ -1,6 +1,6 @@
 ---
 name: parite-addon
-description: Maintient la parité entre l'extension Chrome et le module complémentaire Google Apps Script (Docs/Sheets/Slides). Use whenever you add, modify or fix ANY user-facing feature, exercise, prompt or fix in the Chrome extension (content.js, sidepanel.*, popup.*, themes.css, content.css) or in the backend Cloud Function — the same change almost always has to be ported to gas-addon/. Also use when the user says "ajoute", "corrige", "modifie" a feature without naming a target, or asks whether the add-on is up to date.
+description: Maintient la parité entre l'extension Chrome et le module complémentaire Google Apps Script (Docs/Sheets/Slides). Use whenever you add, modify or fix ANY user-facing feature, exercise, prompt or fix in the Chrome extension (daspa-extension/: content.js, sidepanel.*, popup.*, themes.css, content.css) or in the backend Cloud Function — the same change almost always has to be ported to gas-addon/. Also use when the user says "ajoute", "corrige", "modifie" a feature without naming a target, or asks whether the add-on is up to date.
 ---
 
 # Parité extension Chrome ↔ module complémentaire Apps Script
@@ -10,12 +10,12 @@ Daspalecte existe en **deux implémentations parallèles** qui partagent le mêm
 | | Extension Chrome | Module complémentaire (Docs/Sheets/Slides) |
 |---|---|---|
 | Cible | pages web | Google Docs, Sheets, Slides |
-| Interface | `sidepanel.html/.js/.css` | `gas-addon/Sidebar.html` |
-| Exercices | `content.js` (`render*`) + `content.css` | `gas-addon/ExercisesDialog.html` |
-| Injection page | `content.js` | — (impossible, rendu canvas) |
+| Interface | `daspa-extension/sidepanel.html/.js/.css` | `gas-addon/Sidebar.html` |
+| Exercices | `daspa-extension/content.js` (`render*`) + `content.css` | `gas-addon/ExercisesDialog.html` |
+| Injection page | `daspa-extension/content.js` | — (impossible, rendu canvas) |
 | Backend | `cloud-function/index.js` — **commun aux deux** |
 
-Le module complémentaire est un **portage** de `content.js`. Toute évolution de l'un doit être répercutée sur l'autre, sinon les deux divergent silencieusement.
+Le module complémentaire est un **portage** de `daspa-extension/content.js`. Toute évolution de l'un doit être répercutée sur l'autre, sinon les deux divergent silencieusement.
 
 ## Règle
 
@@ -43,7 +43,7 @@ Ne jamais terminer une tâche sur l'extension sans avoir répondu à : *« est-c
 
 ## Procédure
 
-1. Identifier la fonction modifiée dans `content.js` (ou le prompt dans `cloud-function/index.js`)
+1. Identifier la fonction modifiée dans `daspa-extension/content.js` (ou le prompt dans `cloud-function/index.js`)
 2. Chercher son équivalent : les noms sont préfixés `renderEx*` dans `gas-addon/ExercisesDialog.html` (`renderCloze` → `renderExCloze`)
 3. Appliquer le même changement en respectant les substitutions d'API ci-dessus
 4. **Valider la syntaxe** (voir ci-dessous — obligatoire, le pipeline Apps Script est piégeux)

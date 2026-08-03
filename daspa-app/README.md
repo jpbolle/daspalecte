@@ -57,6 +57,6 @@ Firestore n'accordent que la lecture, et servent de seconde barrière.
 
 ## Thème
 
-Classica, repris de `themes.css` de l'extension. Les tokens sont recopiés dans
+Classica, repris de `daspa-extension/themes.css`. Les tokens sont recopiés dans
 `src/app/globals.css` (bloc `@theme`) et doivent rester alignés avec
-`themes.css:127-244` — si l'un bouge, l'autre suit.
+`daspa-extension/themes.css:127-244` — si l'un bouge, l'autre suit.

@@ -25,7 +25,7 @@ firestore-debug.log
 ui-debug.log
 
 # Artefacts de build Next.js — l'archive App Hosting est faite depuis la racine,
-# seules les regles de CE fichier s'y appliquent (celles de web/.gitignore sont
-# ancrees a web/ et ne sont pas lues). Sans cela : EntityTooLarge a l'envoi.
+# seules les regles de CE fichier s'y appliquent (celles de daspa-app/.gitignore
+# sont ancrees a daspa-app/ et ne sont pas lues). Sans cela : EntityTooLarge a l'envoi.
 .next/
 out/

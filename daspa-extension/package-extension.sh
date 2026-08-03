@@ -2,12 +2,13 @@
 #
 # Fabrique l'archive a envoyer au Chrome Web Store.
 #
-#   ./package-extension.sh
+#   ./daspa-extension/package-extension.sh
+#   # ou depuis ce dossier : ./package-extension.sh
 #
-# N'embarque QUE les fichiers de l'extension : ni web/, ni gas-addon/, ni
-# cloud-function/, ni la documentation. Le Web Store refuse les archives
-# contenant des fichiers inutiles, et surtout cloud-function/ n'a rien a faire
-# dans un paquet public.
+# N'embarque QUE les fichiers de ce dossier (daspa-extension/) : ni daspa-app/,
+# ni gas-addon/, ni cloud-function/, ni la documentation. Le Web Store refuse
+# les archives contenant des fichiers inutiles, et surtout cloud-function/
+# n'a rien a faire dans un paquet public.
 
 set -euo pipefail
 
