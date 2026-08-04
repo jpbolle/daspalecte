@@ -2,6 +2,7 @@ import { getApp, getApps, initializeApp } from "firebase/app";
 import {
   GoogleAuthProvider,
   browserLocalPersistence,
+  browserPopupRedirectResolver,
   connectAuthEmulator,
   getAuth,
   initializeAuth,
@@ -36,12 +37,18 @@ let dbInstance: Firestore | null = null;
  * Google se ferme juste apres l'auth et IndexedDB rate souvent avec
  * « Database is closing/hidden », ce qui fait echouer signInWithPopup alors
  * que Google a deja authentifie l'utilisateur.
+ *
+ * `popupRedirectResolver` est OBLIGATOIRE ici : `getAuth()` embarque le
+ * resolveur par defaut, `initializeAuth()` non. Sans lui, signInWithPopup ET
+ * getRedirectResult echouent tous deux avec `auth/argument-error` — une erreur
+ * qui ne dit rien de sa cause.
  */
 export function getClientAuth(): Auth {
   if (!authInstance) {
     try {
       authInstance = initializeAuth(app, {
         persistence: browserLocalPersistence,
+        popupRedirectResolver: browserPopupRedirectResolver,
       });
     } catch {
       // HMR / double init : Auth est deja attache a l'app.

@@ -99,6 +99,15 @@ export async function completeRedirectSignIn(
     return openServerSession(credential.user);
   } catch (error) {
     const code = (error as { code?: string }).code ?? "";
+    console.warn("[AUTH] reprise de redirection impossible :", code, error);
+
+    // Cette fonction s'execute a CHAQUE ouverture de la page de connexion.
+    // N'alarmer l'eleve que si une connexion etait effectivement en cours :
+    // sinon il voit « la connexion a echoue » avant meme d'avoir clique.
+    const enCours = sessionStorage.getItem(REDIRECT_FLAG);
+    sessionStorage.removeItem(REDIRECT_FLAG);
+    if (!enCours) return null;
+
     return { status: "error", message: code || "sign_in_failed" };
   }
 }
