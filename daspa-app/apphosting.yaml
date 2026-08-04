@@ -67,5 +67,5 @@ env:
   # Origines CORS acceptees : l'extension publiee, et la copie non empaquetee
   # utilisee en developpement (son ID derive du chemin du dossier).
   - variable: ALLOWED_INGEST_ORIGINS
-    value: chrome-extension://dfamiepedkpjldfbdcmdchjfopnhnkgf,chrome-extension://gajbdjbcnecaclanoenlhkcckmfdjffk
+    value: chrome-extension://dfamiepedkpjldfbdcmdchjfopnhnkgf,chrome-extension://gajbdjbcnecaclanoenlhkcckmfdjffk,chrome-extension://kelnkgajmjfidadlpmbhbafibnmnbpml
     availability: [RUNTIME]
