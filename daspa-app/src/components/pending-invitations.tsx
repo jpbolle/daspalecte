@@ -48,6 +48,11 @@ export function PendingInvitations({
                 </p>
               ) : null}
             </div>
+            {invitation.schoolClass ? (
+              <span className="rounded-sm border border-line bg-element px-2 py-0.5 text-[0.75rem] font-medium text-ink-secondary">
+                {invitation.schoolClass}
+              </span>
+            ) : null}
             <span className="text-[0.8125rem] text-ink-muted">
               inscrit {formatSince(invitation.createdAt)}
             </span>

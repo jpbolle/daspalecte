@@ -84,6 +84,7 @@ export async function ingestBatch(
       studentId,
       teacherId,
       sessionId: session.id,
+      source,
       counters,
       knownWords,
     });
@@ -121,6 +122,7 @@ interface DerivedContext {
   studentId: string;
   teacherId: string | null;
   sessionId: string;
+  source: IngestBody["source"];
   counters: SessionCounters;
   /** Mots deja presents au vocabulaire : leur `firstSeenAt` ne bouge plus. */
   knownWords: Set<string>;
@@ -134,6 +136,7 @@ function applyDerivedWrites(context: DerivedContext) {
     studentId,
     teacherId,
     sessionId,
+    source,
     counters,
     knownWords,
   } = context;
@@ -199,6 +202,29 @@ function applyDerivedWrites(context: DerivedContext) {
         total: asNumber(payload.total),
         attempts: Math.max(1, asNumber(payload.attempts)),
         words: asStringArray(payload.words),
+      });
+      return;
+    }
+
+    case "ai_call": {
+      const action = asString(payload.action);
+      // Sans action on ne sait pas a quoi rattacher la depense : l'evenement
+      // reste au journal de la session, mais n'entre pas dans les couts.
+      if (!action) return;
+
+      batch.set(db.collection("aiCalls").doc(event.id), {
+        id: event.id,
+        studentId,
+        teacherId,
+        sessionId,
+        at: event.at,
+        action,
+        model: asString(payload.model),
+        inputTokens: asNumber(payload.inputTokens),
+        outputTokens: asNumber(payload.outputTokens),
+        cacheReadTokens: asNumber(payload.cacheReadTokens),
+        cacheWriteTokens: asNumber(payload.cacheWriteTokens),
+        source,
       });
       return;
     }

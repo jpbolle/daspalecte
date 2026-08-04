@@ -30,6 +30,7 @@ export function StudentCard({
             {student.displayName}
           </p>
           <p className="truncate text-[0.8125rem] text-ink-muted">
+            {student.schoolClass ? `${student.schoolClass} · ` : ""}
             {jamaisActif
               ? "aucune activité"
               : `vu ${formatSince(stats.lastActivityAt ?? student.lastSeenAt)}`}

@@ -6,17 +6,30 @@ import { usePathname } from "next/navigation";
 export interface NavItem {
   href: string;
   label: string;
+  /**
+   * Correspondance stricte. Necessaire pour l'entree d'index d'une section
+   * (`/admin`), sinon elle reste active sur toutes ses sous-pages et deux
+   * onglets s'affichent comme courants en meme temps.
+   */
+  exact?: boolean;
 }
 
-export function MainNav({ items }: { items: NavItem[] }) {
+export function MainNav({
+  items,
+  label = "Sections",
+}: {
+  items: NavItem[];
+  label?: string;
+}) {
   const pathname = usePathname();
   if (items.length === 0) return null;
 
   return (
-    <nav aria-label="Sections" className="flex items-center gap-1">
+    <nav aria-label={label} className="flex items-center gap-1">
       {items.map((item) => {
-        const active =
-          pathname === item.href || pathname.startsWith(`${item.href}/`);
+        const active = item.exact
+          ? pathname === item.href
+          : pathname === item.href || pathname.startsWith(`${item.href}/`);
         return (
           <Link
             key={item.href}

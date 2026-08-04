@@ -31,3 +31,10 @@ export function formatSince(ms: number, now = Date.now()): string {
 export function plural(count: number, one: string, many: string): string {
   return `${count} ${count > 1 ? many : one}`;
 }
+
+const NUMBER = new Intl.NumberFormat("fr-BE");
+
+/** Grands nombres (tokens) avec separateur de milliers. */
+export function formatNumber(value: number): string {
+  return NUMBER.format(Math.round(value));
+}

@@ -135,7 +135,7 @@ export async function resolveAccount(
   }
 
   if (isBootstrapAdmin) {
-    await userRef.set(buildUserDoc(input, "admin", null, now));
+    await userRef.set(buildUserDoc(input, "admin", null, null, now));
     return {
       status: "ok",
       googleSub: input.googleSub,
@@ -165,6 +165,9 @@ export async function resolveAccount(
         },
         role,
         teacherId,
+        // La classe vient de l'invitation : Google ne la connait pas, et elle ne
+        // doit plus bouger ensuite.
+        role === "student" ? (data.schoolClass ?? null) : null,
         now,
       ),
     );
@@ -178,6 +181,7 @@ function buildUserDoc(
   input: AccountInput,
   role: Role,
   teacherId: string | null,
+  schoolClass: string | null,
   now: number,
 ): UserDoc {
   return {
@@ -188,6 +192,7 @@ function buildUserDoc(
     displayName: input.displayName ?? input.email,
     photoURL: input.photoURL,
     teacherId,
+    schoolClass,
     createdAt: now,
     lastSeenAt: now,
   };

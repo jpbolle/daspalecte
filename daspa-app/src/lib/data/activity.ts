@@ -1,8 +1,9 @@
 import "server-only";
 
 import { adminDb } from "@/lib/firebase/admin";
-import type { CurrentUser } from "@/lib/auth/session";
+import { costOf } from "@/lib/ai-cost";
 import type {
+  AiCallDoc,
   EventDoc,
   ExerciseResultDoc,
   ReadingTestDoc,
@@ -42,9 +43,16 @@ export interface ClassStats {
 
 const WEEK = 7 * 86_400_000;
 
-/** Statistiques de tous les eleves d'un prof, en trois requetes au total. */
+/**
+ * Statistiques d'un groupe d'eleves, en quatre requetes au total.
+ *
+ * `scope` est l'identifiant du professeur dont on veut les eleves ; `null`
+ * couvre l'ecole entiere (zone Administration). La portee est passee
+ * explicitement et non deduite du role : l'admin est aussi professeur, et sa
+ * page « Mes eleves » doit rester la sienne (voir `data/people.ts`).
+ */
 export async function loadClassActivity(
-  viewer: CurrentUser,
+  scope: string | null,
   studentIds: string[],
 ): Promise<{ stats: ClassStats; byStudent: Map<string, StudentStats> }> {
   const byStudent = new Map<string, StudentStats>(
@@ -56,7 +64,6 @@ export async function loadClassActivity(
   }
 
   const db = adminDb();
-  const scope = viewer.role === "admin" ? null : viewer.uid;
 
   const [sessions, readingTests, exercises, vocabulary] = await Promise.all([
     scoped(db.collection("sessions"), scope).get(),
@@ -296,6 +303,104 @@ export async function listReadingTests(
   return snapshot.docs
     .map((document) => document.data() as ReadingTestDoc)
     .sort((a, b) => a.at - b.at);
+}
+
+// ---------------------------------------------------------------------------
+// Consommation Claude
+// ---------------------------------------------------------------------------
+
+export interface AiUsageTotals {
+  calls: number;
+  inputTokens: number;
+  outputTokens: number;
+  cacheReadTokens: number;
+  cacheWriteTokens: number;
+  /** En dollars, recalcule a chaque lecture depuis `lib/ai-cost.ts`. */
+  costUsd: number;
+}
+
+export interface AiUsage {
+  total: AiUsageTotals;
+  /** Par action du backend (`summarize`, `generate_exercises`…). */
+  byAction: Map<string, AiUsageTotals>;
+  byStudent: Map<string, AiUsageTotals>;
+  /** Par professeur ayant inscrit l'eleve — `sans-prof` si le lien manque. */
+  byTeacher: Map<string, AiUsageTotals>;
+  /** Date du plus ancien appel connu, pour situer la periode couverte. */
+  firstCallAt: number | null;
+  /** Nombre d'appels dont le modele est inconnu (tarif par defaut applique). */
+  unknownModelCalls: number;
+}
+
+export const NO_TEACHER_KEY = "sans-prof";
+
+/**
+ * Agrege la consommation de tokens. `scope` est l'identifiant du professeur,
+ * `null` pour l'ecole entiere.
+ *
+ * Le cout est calcule appel par appel, avec le modele propre a chaque appel :
+ * un total unique multiplie par un seul tarif serait faux des que le backend
+ * change de modele en cours d'annee.
+ */
+export async function loadAiUsage(scope: string | null): Promise<AiUsage> {
+  const snapshot = await scoped(adminDb().collection("aiCalls"), scope).get();
+
+  const usage: AiUsage = {
+    total: emptyUsage(),
+    byAction: new Map(),
+    byStudent: new Map(),
+    byTeacher: new Map(),
+    firstCallAt: null,
+    unknownModelCalls: 0,
+  };
+
+  for (const document of snapshot.docs) {
+    const call = document.data() as AiCallDoc;
+    const cost = costOf(call, call.model);
+
+    add(usage.total, call, cost);
+    add(bucket(usage.byAction, call.action), call, cost);
+    add(bucket(usage.byStudent, call.studentId), call, cost);
+    add(bucket(usage.byTeacher, call.teacherId ?? NO_TEACHER_KEY), call, cost);
+
+    if (!call.model) usage.unknownModelCalls += 1;
+    if (usage.firstCallAt === null || call.at < usage.firstCallAt) {
+      usage.firstCallAt = call.at;
+    }
+  }
+
+  return usage;
+}
+
+function bucket(
+  map: Map<string, AiUsageTotals>,
+  key: string,
+): AiUsageTotals {
+  const existing = map.get(key);
+  if (existing) return existing;
+  const created = emptyUsage();
+  map.set(key, created);
+  return created;
+}
+
+function add(totals: AiUsageTotals, call: AiCallDoc, cost: number): void {
+  totals.calls += 1;
+  totals.inputTokens += call.inputTokens;
+  totals.outputTokens += call.outputTokens;
+  totals.cacheReadTokens += call.cacheReadTokens;
+  totals.cacheWriteTokens += call.cacheWriteTokens;
+  totals.costUsd += cost;
+}
+
+export function emptyUsage(): AiUsageTotals {
+  return {
+    calls: 0,
+    inputTokens: 0,
+    outputTokens: 0,
+    cacheReadTokens: 0,
+    cacheWriteTokens: 0,
+    costUsd: 0,
+  };
 }
 
 function scoped<T extends FirebaseFirestore.Query>(

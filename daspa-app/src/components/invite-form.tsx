@@ -21,10 +21,15 @@ export function InviteForm({
 }) {
   const router = useRouter();
   const [email, setEmail] = useState("");
-  const [displayName, setDisplayName] = useState("");
+  const [firstName, setFirstName] = useState("");
+  const [lastName, setLastName] = useState("");
+  const [schoolClass, setSchoolClass] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [done, setDone] = useState<string | null>(null);
+
+  // Un professeur n'appartient pas a une classe : le champ ne s'affiche pas.
+  const withClass = role === "student";
 
   async function handleSubmit(event: FormEvent) {
     event.preventDefault();
@@ -35,13 +40,15 @@ export function InviteForm({
     const response = await fetch("/api/invitations", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ email, role, displayName }),
+      body: JSON.stringify({ email, role, firstName, lastName, schoolClass }),
     });
 
     if (response.ok) {
       setDone(email.trim().toLowerCase());
       setEmail("");
-      setDisplayName("");
+      setFirstName("");
+      setLastName("");
+      setSchoolClass("");
       router.refresh();
     } else {
       const body = await response.json().catch(() => ({}));
@@ -52,11 +59,13 @@ export function InviteForm({
 
   return (
     <form onSubmit={handleSubmit} noValidate>
-      <div className="flex flex-wrap items-end gap-3">
+      <div
+        className={`grid gap-3 sm:grid-cols-2 ${withClass ? "lg:grid-cols-4" : "lg:grid-cols-3"}`}
+      >
         <Field
           id={`invite-email-${role}`}
           label="Adresse email"
-          className="min-w-56 flex-1"
+          className={withClass ? "sm:col-span-2 lg:col-span-1" : undefined}
         >
           <input
             id={`invite-email-${role}`}
@@ -70,24 +79,50 @@ export function InviteForm({
           />
         </Field>
 
-        <Field
-          id={`invite-name-${role}`}
-          label="Nom (facultatif)"
-          className="min-w-44 flex-1"
-        >
+        <Field id={`invite-first-${role}`} label="Prénom">
           <input
-            id={`invite-name-${role}`}
+            id={`invite-first-${role}`}
             type="text"
             autoComplete="off"
-            value={displayName}
-            onChange={(event) => setDisplayName(event.target.value)}
+            value={firstName}
+            onChange={(event) => setFirstName(event.target.value)}
             className={inputClass}
           />
         </Field>
 
+        <Field id={`invite-last-${role}`} label="Nom">
+          <input
+            id={`invite-last-${role}`}
+            type="text"
+            autoComplete="off"
+            value={lastName}
+            onChange={(event) => setLastName(event.target.value)}
+            className={inputClass}
+          />
+        </Field>
+
+        {withClass ? (
+          <Field id={`invite-class-${role}`} label="Classe">
+            <input
+              id={`invite-class-${role}`}
+              type="text"
+              autoComplete="off"
+              value={schoolClass}
+              onChange={(event) => setSchoolClass(event.target.value)}
+              placeholder="1C"
+              className={inputClass}
+            />
+          </Field>
+        ) : null}
+      </div>
+
+      <div className="mt-4 flex flex-wrap items-center gap-3">
         <Button type="submit" loading={busy} disabled={email.trim().length === 0}>
           {label}
         </Button>
+        <p className="text-[0.8125rem] text-ink-muted">
+          Seule l’adresse email est obligatoire.
+        </p>
       </div>
 
       {error ? (

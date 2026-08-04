@@ -22,7 +22,13 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "forbidden" }, { status: 403 });
   }
 
-  let body: { email?: unknown; role?: unknown; displayName?: unknown };
+  let body: {
+    email?: unknown;
+    role?: unknown;
+    firstName?: unknown;
+    lastName?: unknown;
+    schoolClass?: unknown;
+  };
   try {
     body = await request.json();
   } catch {
@@ -39,10 +45,14 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "admin_only" }, { status: 403 });
   }
 
+  const firstName = trimmed(body.firstName);
+  const lastName = trimmed(body.lastName);
+  const schoolClass = trimmed(body.schoolClass);
+
+  // Le nom affiche est reconstitue ici plutot que saisi : un seul champ a
+  // maintenir, et l'ordre « prenom nom » reste coherent partout.
   const displayName =
-    typeof body.displayName === "string" && body.displayName.trim().length > 0
-      ? body.displayName.trim()
-      : null;
+    [firstName, lastName].filter(Boolean).join(" ") || null;
 
   const db = adminDb();
 
@@ -72,6 +82,10 @@ export async function POST(request: Request) {
     teacherId: role === "student" ? current.uid : null,
     invitedBy: current.uid,
     displayName,
+    firstName,
+    lastName,
+    // Un professeur n'appartient pas a une classe.
+    schoolClass: role === "student" ? schoolClass : null,
     createdAt: Date.now(),
     claimedAt: null,
     claimedBy: null,
@@ -79,6 +93,13 @@ export async function POST(request: Request) {
   await invitationRef.set(invitation);
 
   return NextResponse.json({ invitation }, { status: 201 });
+}
+
+/** Champ texte facultatif : borne, nettoye, et `null` plutot que chaine vide. */
+function trimmed(value: unknown, max = 80): string | null {
+  if (typeof value !== "string") return null;
+  const clean = value.trim().slice(0, max);
+  return clean.length > 0 ? clean : null;
 }
 
 /** Retire une invitation encore en attente. */

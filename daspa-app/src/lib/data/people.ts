@@ -8,20 +8,34 @@ import type { InvitationDoc, UserDoc } from "@/lib/types";
  * Les pages lisent par le SDK Admin, avec le controle d'acces fait ici a partir
  * du role du cookie de session. Les regles Firestore restent la deuxieme
  * barriere, pour tout acces direct depuis le navigateur.
+ *
+ * Regle de portee : ces fonctions prennent un identifiant de professeur
+ * explicite plutot que de deduire la portee du role de l'appelant. L'admin est
+ * aussi professeur de francais — il a ses propres eleves — et « mes eleves »
+ * doit vouloir dire la meme chose pour lui que pour un collegue. Les vues qui
+ * couvrent l'ecole entiere sont donc des fonctions distinctes
+ * (`listAllStudents`), appelees seulement par la zone Administration.
  */
 
-export async function listStudents(viewer: CurrentUser): Promise<UserDoc[]> {
-  const users = adminDb().collection("users");
-  const query =
-    viewer.role === "admin"
-      ? users.where("role", "==", "student")
-      : users.where("teacherId", "==", viewer.uid);
-
-  const snapshot = await query.get();
+/** Les eleves inscrits par ce professeur, et eux seuls. */
+export async function listStudentsFor(teacherId: string): Promise<UserDoc[]> {
+  const snapshot = await adminDb()
+    .collection("users")
+    .where("teacherId", "==", teacherId)
+    .get();
   return snapshot.docs
     .map((doc) => doc.data() as UserDoc)
     .filter((user) => user.role === "student")
     .sort(byName);
+}
+
+/** Tous les eleves de l'ecole — reserve a la zone Administration. */
+export async function listAllStudents(): Promise<UserDoc[]> {
+  const snapshot = await adminDb()
+    .collection("users")
+    .where("role", "==", "student")
+    .get();
+  return snapshot.docs.map((doc) => doc.data() as UserDoc).sort(byName);
 }
 
 export async function listTeachers(): Promise<UserDoc[]> {
@@ -32,15 +46,19 @@ export async function listTeachers(): Promise<UserDoc[]> {
   return snapshot.docs.map((doc) => doc.data() as UserDoc).sort(byName);
 }
 
+/**
+ * Invitations encore en attente. `invitedBy` a `null` couvre toute l'ecole
+ * (Administration) ; sinon on ne renvoie que celles de ce professeur.
+ */
 export async function listPendingInvitations(
-  viewer: CurrentUser,
+  invitedBy: string | null,
   role: "student" | "teacher",
 ): Promise<InvitationDoc[]> {
   const invitations = adminDb().collection("invitations");
   const query =
-    viewer.role === "admin"
+    invitedBy === null
       ? invitations.where("role", "==", role)
-      : invitations.where("invitedBy", "==", viewer.uid);
+      : invitations.where("invitedBy", "==", invitedBy);
 
   const snapshot = await query.get();
   return snapshot.docs
@@ -64,6 +82,11 @@ export async function getStudentFor(
     return student;
   }
   return null;
+}
+
+/** Index uid → personne, pour joindre les agregats aux noms affichables. */
+export function indexByUid(people: UserDoc[]): Map<string, UserDoc> {
+  return new Map(people.map((person) => [person.uid, person]));
 }
 
 function byName(a: UserDoc, b: UserDoc): number {

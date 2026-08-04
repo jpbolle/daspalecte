@@ -99,6 +99,21 @@ before(async () => {
       percentage: 80,
     });
 
+    await setDoc(doc(db, "aiCalls", "appel-1"), {
+      id: "appel-1",
+      studentId: ELEVE,
+      teacherId: PROF,
+      sessionId: "session-1",
+      at: Date.now(),
+      action: "generate_exercises",
+      model: "claude-sonnet-4-5-20250929",
+      inputTokens: 1200,
+      outputTokens: 800,
+      cacheReadTokens: 0,
+      cacheWriteTokens: 0,
+      source: "extension",
+    });
+
     await setDoc(doc(db, "invitations", "nouveau@cnddinant.be"), {
       email: "nouveau@cnddinant.be",
       role: "student",
@@ -236,6 +251,58 @@ describe("sessions et resultats", () => {
   it("le prof lit les tests de lecture de son eleve", async () => {
     await assertSucceeds(
       getDoc(doc(asTeacher(PROF), "readingTests", "test-1")),
+    );
+  });
+});
+
+describe("appels a Claude", () => {
+  it("l'admin lit n'importe quel appel", async () => {
+    await assertSucceeds(getDoc(doc(asAdmin(), "aiCalls", "appel-1")));
+  });
+
+  it("le prof de l'eleve lit l'appel", async () => {
+    await assertSucceeds(getDoc(doc(asTeacher(PROF), "aiCalls", "appel-1")));
+  });
+
+  it("l'eleve concerne lit son propre appel", async () => {
+    await assertSucceeds(getDoc(doc(asStudent(ELEVE), "aiCalls", "appel-1")));
+  });
+
+  it("un collegue ne lit pas les appels des eleves d'un autre prof", async () => {
+    await assertFails(
+      getDoc(doc(asTeacher(AUTRE_PROF), "aiCalls", "appel-1")),
+    );
+  });
+
+  it("un autre eleve ne lit pas cet appel", async () => {
+    await assertFails(
+      getDoc(doc(asStudent(AUTRE_ELEVE), "aiCalls", "appel-1")),
+    );
+  });
+
+  it("l'admin liste toute la consommation de l'ecole", async () => {
+    await assertSucceeds(getDocs(collection(asAdmin(), "aiCalls")));
+  });
+
+  it("un prof liste la consommation de sa seule classe", async () => {
+    await assertSucceeds(
+      getDocs(
+        query(
+          collection(asTeacher(PROF), "aiCalls"),
+          where("teacherId", "==", PROF),
+        ),
+      ),
+    );
+  });
+
+  it("un prof ne liste pas la consommation d'un collegue", async () => {
+    await assertFails(
+      getDocs(
+        query(
+          collection(asTeacher(AUTRE_PROF), "aiCalls"),
+          where("teacherId", "==", PROF),
+        ),
+      ),
     );
   });
 });

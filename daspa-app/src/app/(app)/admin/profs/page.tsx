@@ -1,28 +1,37 @@
-import { redirect } from "next/navigation";
-import { getCurrentUser } from "@/lib/auth/session";
-import { listPendingInvitations, listTeachers } from "@/lib/data/people";
+import {
+  listAllStudents,
+  listPendingInvitations,
+  listTeachers,
+} from "@/lib/data/people";
 import { InviteForm } from "@/components/invite-form";
 import { PendingInvitations } from "@/components/pending-invitations";
 import { Avatar } from "@/components/ui/avatar";
 import { EmptyState, Panel, PanelHeader } from "@/components/ui/panel";
-import { formatSince } from "@/lib/format";
+import { formatSince, plural } from "@/lib/format";
 
 export const metadata = { title: "Professeurs — Daspalecte" };
 
+// Le garde-fou de role et le titre de section vivent dans admin/layout.tsx.
 export default async function TeachersAdmin() {
-  const user = await getCurrentUser();
-  if (!user) redirect("/login");
-  if (user.role !== "admin") redirect("/prof");
-
-  const [teachers, invitations] = await Promise.all([
+  const [teachers, invitations, students] = await Promise.all([
     listTeachers(),
-    listPendingInvitations(user, "teacher"),
+    listPendingInvitations(null, "teacher"),
+    listAllStudents(),
   ]);
+
+  const studentsPerTeacher = new Map<string, number>();
+  for (const student of students) {
+    if (!student.teacherId) continue;
+    studentsPerTeacher.set(
+      student.teacherId,
+      (studentsPerTeacher.get(student.teacherId) ?? 0) + 1,
+    );
+  }
 
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl">Professeurs</h1>
+        <h2 className="text-xl">Professeurs</h2>
         <p className="mt-1.5 text-sm text-ink-secondary">
           Chaque professeur inscrit ensuite ses propres élèves et ne voit que
           ceux-là.
@@ -70,6 +79,13 @@ export default async function TeachersAdmin() {
                     administrateur
                   </span>
                 ) : null}
+                <span className="text-[0.8125rem] tabular-nums text-ink-secondary">
+                  {plural(
+                    studentsPerTeacher.get(teacher.uid) ?? 0,
+                    "élève",
+                    "élèves",
+                  )}
+                </span>
                 <span className="text-[0.8125rem] text-ink-muted">
                   vu {formatSince(teacher.lastSeenAt)}
                 </span>

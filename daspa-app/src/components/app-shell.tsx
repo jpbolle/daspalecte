@@ -5,10 +5,16 @@ import { MainNav, type NavItem } from "./main-nav";
 import { SignOutButton } from "./sign-out-button";
 import { Avatar } from "./ui/avatar";
 
+/**
+ * Deux zones pour l'admin, qui est aussi professeur de francais : « Mes élèves »
+ * est sa classe (identique a celle d'un collegue), « Administration » couvre
+ * l'ecole. Sans cette separation, sa page de classe afficherait tous les eleves
+ * de l'ecole des qu'un deuxieme professeur en inscrit.
+ */
 const NAV: Record<string, NavItem[]> = {
   admin: [
     { href: "/prof", label: "Mes élèves" },
-    { href: "/admin/profs", label: "Professeurs" },
+    { href: "/admin", label: "Administration" },
   ],
   teacher: [{ href: "/prof", label: "Mes élèves" }],
   student: [],

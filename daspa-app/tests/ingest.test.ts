@@ -258,6 +258,79 @@ describe("ingestBatch", () => {
     assert.equal(events.size, 2);
   });
 
+  it("projette un appel a Claude dans aiCalls", async () => {
+    await ingestBatch(
+      db,
+      target,
+      body([
+        {
+          id: "ai1",
+          type: "ai_call",
+          at: Date.now(),
+          payload: {
+            action: "generate_exercises",
+            model: "claude-sonnet-4-5-20250929",
+            inputTokens: 1200,
+            outputTokens: 800,
+            cacheReadTokens: 0,
+            cacheWriteTokens: 0,
+          },
+        },
+        // Sans action, la depense n'est rattachable a rien : pas de projection.
+        {
+          id: "ai2",
+          type: "ai_call",
+          at: Date.now(),
+          payload: { inputTokens: 10, outputTokens: 5 },
+        },
+      ]),
+    );
+
+    const calls = await db.collection("aiCalls").get();
+    assert.equal(calls.size, 1, "un appel sans action n'est pas projete");
+
+    const call = calls.docs[0].data();
+    assert.equal(call.action, "generate_exercises");
+    assert.equal(call.model, "claude-sonnet-4-5-20250929");
+    assert.equal(call.inputTokens, 1200);
+    assert.equal(call.outputTokens, 800);
+    assert.equal(call.studentId, STUDENT);
+    assert.equal(call.teacherId, TEACHER);
+    assert.equal(call.sessionId, "session-test");
+    assert.equal(call.source, "extension");
+
+    // Les deux evenements bruts restent au journal de la session.
+    const events = await db
+      .collection("sessions")
+      .doc("session-test")
+      .collection("events")
+      .get();
+    assert.equal(events.size, 2);
+  });
+
+  it("ne compte pas deux fois un appel a Claude rejoue", async () => {
+    const payload = body([
+      {
+        id: "ai-rejoue",
+        type: "ai_call",
+        at: Date.now(),
+        payload: {
+          action: "summarize",
+          model: "claude-sonnet-4-5-20250929",
+          inputTokens: 500,
+          outputTokens: 100,
+        },
+      },
+    ]);
+
+    assert.equal(await ingestBatch(db, target, payload), 1);
+    assert.equal(await ingestBatch(db, target, payload), 0);
+
+    const calls = await db.collection("aiCalls").get();
+    assert.equal(calls.size, 1);
+    assert.equal(calls.docs[0].data().inputTokens, 500);
+  });
+
   it("met a jour la derniere activite de l'eleve", async () => {
     await ingestBatch(
       db,
@@ -310,7 +383,13 @@ describe("parseIngestBody", () => {
 });
 
 async function clearCollections() {
-  for (const name of ["sessions", "readingTests", "exerciseResults", "users"]) {
+  for (const name of [
+    "sessions",
+    "readingTests",
+    "exerciseResults",
+    "aiCalls",
+    "users",
+  ]) {
     const snapshot = await db.collection(name).get();
     await Promise.all(
       snapshot.docs.map(async (document) => {

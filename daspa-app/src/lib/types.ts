@@ -27,6 +27,13 @@ export interface UserDoc {
   photoURL: string | null;
   /** Pour un eleve : `uid` (sub Google) du prof qui l'a inscrit. */
   teacherId: string | null;
+  /**
+   * Classe de l'eleve (« 1C », « accueil A »…), telle que saisie par le prof a
+   * l'inscription. Recopiee depuis l'invitation a la creation du compte, puis
+   * jamais ecrasee par Google. `null` pour un prof, et pour les comptes crees
+   * avant l'ajout du champ.
+   */
+  schoolClass: string | null;
   createdAt: number;
   lastSeenAt: number;
 }
@@ -39,7 +46,17 @@ export interface InvitationDoc {
   teacherId: string | null;
   /** uid de celui qui a cree l'invitation (un prof ou l'admin). */
   invitedBy: string;
+  /**
+   * Nom complet reconstitue depuis `firstName`/`lastName`. Conserve parce que
+   * c'est lui qui s'affiche partout, et qu'il sert de repli au `displayName` du
+   * compte tant que l'eleve ne s'est pas connecte (au premier login, le nom du
+   * compte Google prend le relais — voir `resolveAccount`).
+   */
   displayName: string | null;
+  firstName: string | null;
+  lastName: string | null;
+  /** Classe saisie a l'inscription, recopiee sur le compte au premier login. */
+  schoolClass: string | null;
   createdAt: number;
   claimedAt: number | null;
   claimedBy: string | null;
@@ -75,7 +92,15 @@ export type EventType =
   | "comprehension"
   | "exercise"
   | "reading_test"
-  | "capture";
+  | "capture"
+  /**
+   * Un appel a Claude, avec ses tokens. Volontairement separe des evenements
+   * pedagogiques : un appel ne correspond pas a une activite. Les sept
+   * exercices d'une session viennent d'UNE seule generation, une verification
+   * de phrase ne produit aucun exercice, et une regeneration coute sans rien
+   * ajouter au parcours de l'eleve.
+   */
+  | "ai_call";
 
 export interface EventDoc {
   id: string;
@@ -129,6 +154,31 @@ export interface ReadingTestDoc {
   percentage: number;
   pageUrl: string | null;
   pageTitle: string | null;
+}
+
+/**
+ * Un appel a l'API Claude, avec sa consommation de tokens.
+ *
+ * Le cout n'est pas stocke : voir `lib/ai-cost.ts` — on garde les tokens (un
+ * fait mesure) et on recalcule le cout a l'affichage (une convention tarifaire
+ * qui, elle, changera).
+ */
+export interface AiCallDoc {
+  id: string;
+  studentId: string;
+  teacherId: string | null;
+  sessionId: string;
+  at: number;
+  /** Action du backend : `summarize`, `generate_exercises`, `analyze_screenshot`… */
+  action: string;
+  /** Identifiant de modele renvoye par l'API, suffixe de date compris. */
+  model: string | null;
+  inputTokens: number;
+  outputTokens: number;
+  cacheReadTokens: number;
+  cacheWriteTokens: number;
+  /** `extension` ou `addon` — l'add-on n'ingere pas encore (phase 5). */
+  source: string;
 }
 
 /** Mot travaille, agrege sur toutes les sessions de l'eleve. */

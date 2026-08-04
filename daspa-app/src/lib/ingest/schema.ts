@@ -33,6 +33,7 @@ const EVENT_TYPES: EventType[] = [
   "exercise",
   "reading_test",
   "capture",
+  "ai_call",
 ];
 
 const EXERCISE_TYPES: ExerciseType[] = [

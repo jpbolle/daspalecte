@@ -1,6 +1,6 @@
 import { redirect } from "next/navigation";
 import { getCurrentUser } from "@/lib/auth/session";
-import { listPendingInvitations, listStudents } from "@/lib/data/people";
+import { listPendingInvitations, listStudentsFor } from "@/lib/data/people";
 import { loadClassActivity } from "@/lib/data/activity";
 import { CollapsiblePanel } from "@/components/collapsible-panel";
 import { InviteForm } from "@/components/invite-form";
@@ -17,12 +17,14 @@ export default async function TeacherHome() {
   if (!user) redirect("/login");
   if (user.role === "student") redirect("/moi");
 
+  // Toujours scope sur l'utilisateur, y compris pour l'admin : cette page est
+  // sa classe de francais, pas l'ecole. La vue ecole vit dans /admin.
   const [students, invitations] = await Promise.all([
-    listStudents(user),
-    listPendingInvitations(user, "student"),
+    listStudentsFor(user.uid),
+    listPendingInvitations(user.uid, "student"),
   ]);
   const { stats, byStudent } = await loadClassActivity(
-    user,
+    user.uid,
     students.map((student) => student.uid),
   );
 
@@ -34,6 +36,9 @@ export default async function TeacherHome() {
           {students.length === 0
             ? "Aucun élève inscrit pour l’instant."
             : `${plural(stats.activeThisWeek, "élève actif", "élèves actifs")} cette semaine sur ${students.length}.`}
+          {user.role === "admin"
+            ? " Seuls les élèves que tu as inscrits — l’école entière est dans Administration."
+            : null}
         </p>
       </header>
 
