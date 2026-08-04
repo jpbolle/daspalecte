@@ -12,7 +12,7 @@
 
 // URL de l'app web (Firebase App Hosting). Pour developper en local, poser
 // `daspalecteApiBase` dans chrome.storage.local : cette clef prime sur la constante.
-const DEFAULT_API_BASE = 'https://daspalecte--essai-27712.europe-west4.hosted.app';
+const DEFAULT_API_BASE = 'https://daspalecte.edukids.pedagokit.be';
 
 const QUEUE_KEY = 'daspalecteQueue';
 const SESSIONS_KEY = 'daspalecteSessions';

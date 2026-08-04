@@ -31,7 +31,7 @@ env:
   # les URI de redirection autorises du client OAuth « Web client (auto created
   # by Google Service) », sinon Google repond redirect_uri_mismatch.
   - variable: NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN
-    value: daspalecte--essai-27712.europe-west4.hosted.app
+    value: daspalecte.edukids.pedagokit.be
     availability: [BUILD, RUNTIME]
   - variable: NEXT_PUBLIC_FIREBASE_PROJECT_ID
     value: essai-27712
