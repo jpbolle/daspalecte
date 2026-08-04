@@ -358,13 +358,51 @@ Consequence voulue : **un eleve n'a pas besoin d'ouvrir l'app web.** Son premier
 - **Reorganisation monorepo (2026-08-03)** : `web/` → `daspa-app/`, fichiers extension → `daspa-extension/`. Charger l'extension locale depuis `daspa-extension/` (le chemin absolu change → nouvel ID Chrome pour la copie non empaquetee)
 - **Alerte GitHub sur `NEXT_PUBLIC_FIREBASE_API_KEY`** : sans objet. Une cle Web Firebase identifie le projet, elle ne l'autorise pas ; ce sont les regles Firestore qui protegent. A restreindre malgre tout par API et par domaine referent dans la console Google Cloud
 
+### Domaine personnalise et publication Web Store (2026-08-04)
+
+- **L'app vit desormais sur `https://daspalecte.edukids.pedagokit.be`** (zone OVH `pedagokit.be`, domaine personnalise du backend App Hosting `daspalecte`). L'URL `daspalecte--essai-27712.europe-west4.hosted.app` continue de fonctionner en parallele
+- **Trois enregistrements DNS**, tous sur la zone `pedagokit.be`, champ « sous-domaine » **relatif** (donc `daspalecte.edukids`, jamais le suffixe complet) : un `A` vers l'IP donnee par la console, un `TXT` `fah-claim=...`, et un `CNAME` `_acme-challenge_<jeton>.daspalecte.edukids` vers `...authorize.certificatemanager.goog.` — **c'est ce troisieme qui delivre le certificat**, les deux premiers ne font que valider la propriete. Certificat emis en 4 min 30 une fois le CNAME propage
+- **Piege OVH** : un CNAME ne peut pas coexister avec d'autres enregistrements sur le meme nom. L'erreur « Le sous-domaine n'est pas deja utilise par un enregistrement CNAME » signifie en pratique qu'on a oublie le prefixe `_acme-challenge_...` et vise le nom qui porte deja les A/TXT
+
+#### Le piege OAuth qui a coute la matinee : trois clients dans un seul projet
+
+`redirect_uri_mismatch` a bloque la connexion pendant des heures parce que l'URI de redirection avait ete ajoutee au **mauvais client OAuth**. `essai-27712` en contient trois, et ils ne servent pas au meme flux :
+
+| Client | Prefixe | Sert a | Redirections |
+|---|---|---|---|
+| Web client (auto created by Google Service: firebase) | `474562157268-oamos3kl…` | **la connexion de l'app web** | `https://<domaine>/__/auth/handler` |
+| Application Web (cree a la main) | `474562157268-oboltab8…` | `launchWebAuthFlow` de l'extension | `https://<id-extension>.chromiumapp.org/` |
+| Extension Chrome | — | vestige, inutilise | — |
+
+- **Le client_id reellement envoye se lit dans l'URL de la page d'erreur Google** (`&client_id=...`) : c'est le moyen le plus rapide de savoir lequel ouvrir, plutot que de deviner
+- Les **domaines autorises de Firebase Auth** (console Authentication) sont un reglage **distinct** des URI de redirection du client OAuth : les deux sont necessaires, et le premier ne dispense pas du second
+- A chaque nouveau domaine servant l'app, il faut donc : domaine autorise Firebase Auth **+** URI `/__/auth/handler` sur `oamos3kl…` **+** `NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN` dans `apphosting.yaml`
+
+#### L'identifiant de l'extension locale change avec le chemin du dossier
+
+- La reorganisation du monorepo l'a fait passer de `gajbdjbcnecaclanoenlhkcckmfdjffk` a **`kelnkgajmjfidadlpmbhbafibnmnbpml`**. Deux endroits a mettre a jour a chaque fois, sinon la connexion ou l'ingestion casse en silence :
+  1. URI `https://<id>.chromiumapp.org/` sur le client OAuth `oboltab8…`
+  2. `chrome-extension://<id>` dans `ALLOWED_INGEST_ORIGINS` (`apphosting.yaml`) — sans quoi `/api/ingest` ne renvoie pas d'`Access-Control-Allow-Origin` et le navigateur bloque tous les envois
+- L'ID du Web Store (`dfamiepedkpjldfbdcmdchjfopnhnkgf`) ne bouge jamais, lui
+
+#### Soumission de la version 2.0 au Chrome Web Store
+
+- Paquet `daspalecte-2.0.zip` regenere apres la bascule de domaine, envoye et **soumis a examen le 2026-08-04**. Examen approfondi attendu (accès a l'hote `<all_urls>` **et** code distant declares) : plusieurs jours
+- **Fiche reecrite** : l'ancienne annoncait « Aucune collecte de donnees personnelles », ce qui est faux depuis `analytics.js`. Elle annoncait aussi 5 exercices (il y en a 7) et l'envoi du score « a l'enseignant » via Sheets
+- **Utilisation des donnees** : cocher **Historique Web** est obligatoire — chaque evenement transporte `context: {url, title}` plus un horodatage, ce qui correspond mot pour mot a la definition Google. Cochees aussi : informations personnelles, activite de l'utilisateur, contenu du site web
+- **Code distant = Oui** : les polices sont chargees depuis `fonts.googleapis.com` (`popup.html`, `sidepanel.html`, `pdfviewer.css`). Les embarquer localement ferait passer a « Non » et eviterait l'examen approfondi a chaque mise a jour — piste pour plus tard
+- **Politique de confidentialite** : `https://www.pedagokit.be/politiques-de-confidentialité-extensions-et-apps/daspalecte` (Google Sites, **penser au bouton Publier**, l'editeur ne suffit pas). Le fichier `daspa-extension/privacy-policy.html` du repo est **obsolete** (il decrit encore le flux Google Sheets) et n'est heberge nulle part — a supprimer ou a resynchroniser
+- **Decision utilisateur** : la connexion au compte n'est plus presentee comme facultative, l'eleve doit se connecter. **Mais rien ne le force cote logiciel** aujourd'hui : sans compte, les evenements s'empilent simplement dans la file locale. Verrouiller le panneau tant qu'aucun compte n'est connecte reste a faire si on veut que le logiciel corresponde a la consigne
+
 ### Reste a faire
 
 - **Verifier le flux de bout en bout avec un vrai compte eleve.** Attention : `jeanphilippe.bolle@cnddinant.be` est provisionne en **admin**, donc `/api/ingest` repond `{ok: true, ignored: "not_a_student"}` — c'est la preuve que la chaine jeton + CORS + resolution de compte fonctionne, mais aucune donnee n'est ecrite. Il faut un compte inscrit comme eleve pour voir des sessions apparaitre
-- **Basculer `DEFAULT_API_BASE`** (`analytics.js`) de `http://127.0.0.1:3000` vers l'URL App Hosting le jour du deploiement. `daspalecteApiBase` dans `chrome.storage.local` permet de surcharger sans reconstruire
+- ~~Basculer `DEFAULT_API_BASE`~~ — fait le 2026-08-04, `analytics.js` pointe sur `https://daspalecte.edukids.pedagokit.be`. `daspalecteApiBase` dans `chrome.storage.local` permet toujours de surcharger sans reconstruire
 - **Phase 5 — add-on Apps Script** : l'`aud` d'un token Apps Script est le client OAuth du projet GCP associe au script ; il faudra rattacher le projet Apps Script a `essai-27712` et ajouter cette audience a `ALLOWED_AUDIENCES`
 - Retirer `sendScoreToTeacher` et l'URL `script.google.com` de `content.js` une fois le nouveau flux verifie (l'envoi vers la Sheet est **conserve en parallele** pendant la transition, un TODO le signale dans le code)
-- Activer le plan Blaze et deployer sur App Hosting
+- ~~Activer le plan Blaze et deployer sur App Hosting~~ — fait
+- **Verrouiller l'usage sans compte** si la connexion doit vraiment etre obligatoire (voir la section publication Web Store ci-dessus)
+- **Embarquer les polices localement** pour sortir de la categorie « code distant » et raccourcir les examens du Web Store
 
 ## Chantier a venir — OAuth Google et plateforme web de resultats
 
