@@ -17,8 +17,21 @@ env:
   - variable: NEXT_PUBLIC_FIREBASE_API_KEY
     value: AIzaSyADUY1XqUA20TkrnhsfeaARZLdjVTaDv9I
     availability: [BUILD, RUNTIME]
+  # Le domaine de l'app elle-meme, PAS essai-27712.firebaseapp.com.
+  #
+  # C'est ce qui rend la connexion fiable : la fenetre Google s'ouvre alors sur
+  # la meme origine que la page, donc plus de stockage inter-sites bloque par
+  # Chrome, plus de COOP qui coupe le lien, plus de course IndexedDB
+  # (« Database is closing ») a la fermeture de la fenetre.
+  #
+  # Fonctionne grace au rewrite `/__/auth/:path*` de next.config.ts, qui sert le
+  # gestionnaire d'auth Firebase sous notre domaine.
+  #
+  # PREALABLE : l'URI `https://<ce domaine>/__/auth/handler` doit figurer dans
+  # les URI de redirection autorises du client OAuth « Web client (auto created
+  # by Google Service) », sinon Google repond redirect_uri_mismatch.
   - variable: NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN
-    value: essai-27712.firebaseapp.com
+    value: daspalecte--essai-27712.europe-west4.hosted.app
     availability: [BUILD, RUNTIME]
   - variable: NEXT_PUBLIC_FIREBASE_PROJECT_ID
     value: essai-27712
