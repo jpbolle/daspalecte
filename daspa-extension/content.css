@@ -1117,6 +1117,14 @@ html.daspalecte-page-pushed {
     gap: 20px !important;
     box-sizing: border-box !important;
     transition: all 0.3s ease !important;
+    /* Toute la carte est le déclencheur du retournement (il n'y a plus de bouton 🔄) :
+       le curseur main doit le faire comprendre au premier coup d'œil. */
+    cursor: pointer !important;
+}
+
+.family-card-front:focus-visible {
+    outline: 2px solid var(--t-primary) !important;
+    outline-offset: 2px !important;
 }
 
 .family-card-back {
@@ -1160,41 +1168,8 @@ html.daspalecte-page-pushed {
     border-color: var(--t-primary) !important;
 }
 
-.family-flip-icon-btn {
-    all: unset !important;
-    position: absolute !important;
-    top: 10px !important;
-    right: 10px !important;
-    width: 32px !important;
-    height: 32px !important;
-    display: flex !important;
-    align-items: center !important;
-    justify-content: center !important;
-    border-radius: 50% !important;
-    background: var(--t-glass-bg) !important;
-    border: 1px solid var(--t-border) !important;
-    cursor: pointer !important;
-    font-size: 16px !important;
-    line-height: 1 !important;
-    transition: all 0.2s ease !important;
-}
-
-.family-flip-icon-btn:hover {
-    background: var(--t-primary-a15) !important;
-    border-color: var(--t-primary) !important;
-    transform: rotate(180deg) !important;
-}
-
-.family-flip-icon-btn:focus-visible {
-    outline: 2px solid var(--t-primary) !important;
-    outline-offset: 2px !important;
-}
-
-@media (prefers-reduced-motion: reduce) {
-    .family-flip-icon-btn:hover {
-        transform: none !important;
-    }
-}
+/* Le bouton 🔄 (.family-flip-icon-btn) a disparu : la carte entière se retourne au clic,
+   comme dans le module complémentaire. Ses styles ont été retirés avec lui. */
 
 .family-input.correct {
     border-color: var(--t-success) !important;

@@ -1,240 +1,204 @@
 # Daspalecte
 
-Extension Chrome d'aide à la lecture pour les étudiants en Français Langue Étrangère (FLE), spécialement conçue pour les élèves du dispositif DASPA (Dispositif d'Accueil et de Scolarisation des élèves Primo-Arrivants).
+Outils d'aide à la lecture pour les élèves en **Français Langue Étrangère (FLE)**, en particulier
+ceux du dispositif **DASPA** (Dispositif d'Accueil et de Scolarisation des élèves Primo-Arrivants)
+en Belgique.
 
-![Version](https://img.shields.io/badge/version-1.2-blue)
+![Version](https://img.shields.io/badge/version-2.0.1-blue)
 ![Manifest](https://img.shields.io/badge/manifest-v3-green)
-![License](https://img.shields.io/badge/license-MIT-lightgrey)
 
-## Fonctionnalités principales
+L'élève lit une page web, un PDF ou un document Google. Il clique sur un mot qu'il ne comprend pas,
+demande la reformulation d'un paragraphe trop dense, puis s'entraîne sur les mots qu'il a lui-même
+rencontrés. Son professeur suit sa progression depuis une application web.
 
-### 1. Traducteur mot à mot
-- **Traduction instantanée** : Cliquez sur n'importe quel mot d'une page web pour obtenir sa traduction
-- **10 langues supportées** : Arabe, Anglais, Dari, Espagnol, Pashto, Polonais, Roumain, Russe, Turc, Ukrainien
-- **Interface intuitive** : Les traductions apparaissent dans une bulle cyan au-dessus du mot
-- **Gestion des ligatures françaises** : Support complet des caractères œ, æ, etc.
-- **Protection des liens** : Empêche les clics accidentels sur les hyperliens pendant la traduction
-- **Compatible avec la compréhension** : Peut être utilisé simultanément avec l'outil de compréhension
+## Le monorepo
 
-### 2. Gestion de vocabulaire
-- **Collection automatique** : Les mots traduits sont ajoutés à une liste personnelle
-- **Organisation** : Cases à cocher pour sélectionner et gérer les mots
-- **Suppression** : Retirez facilement les mots non pertinents
-- **Persistance** : Vos mots sont sauvegardés localement
+Quatre composants, deux implémentations parallèles de la même idée :
 
-### 3. Aide à la compréhension (IA)
-- **Simplification intelligente** : Boutons magiques (✨) sur les paragraphes de plus de 50 caractères
-- **Double aide** :
-  - **Résumé** : Une phrase de maximum 30 mots capturant l'idée principale
-  - **Reformulation** : Texte complet simplifié avec traductions des mots difficiles
-- **Traduction contextuelle** : Mots difficiles traduits entre parenthèses dans votre langue maternelle
-- **Propulsé par Claude Sonnet 4.5** : IA de dernière génération pour simplifications et exercices de haute qualité
-- **Affichage dynamique** : Activez/désactivez les simplifications à volonté
-- **Compatible avec le traducteur** : Les deux outils peuvent être actifs simultanément
+| Dossier | Rôle |
+|---|---|
+| `daspa-extension/` | Extension Chrome — pages web et PDF |
+| `gas-addon/` | Module complémentaire Google Docs / Sheets / Slides (Apps Script) |
+| `daspa-app/` | Application web de résultats (Next.js + Firebase) |
+| `cloud-function/` | Backend Claude (Cloud Run, **hors dépôt**) |
 
-### 4. Génération d'exercices
-- **5 types d'exercices progressifs** (ordre pédagogique) :
-  1. **Associations** : Reliez les mots français à leur traduction
-  2. **Famille de mots** : Découvrez les mots de la même famille
-  3. **Étiquettes** : Glissez-déposez le bon mot dans la phrase
-  4. **Lecture** : Lisez un texte contextuel en français
-  5. **Défi final** : Complétez les phrases (texte à trous)
-- **Textes en français** : Tous les exercices sont formulés en français (langue à apprendre)
-- **Navigation libre** :
-  - Boutons "Précédent" et "Suivant" pour naviguer entre les exercices
-  - Possibilité de sauter un exercice bloquant
-- **Désactivation automatique du traducteur** : Pour éviter les distractions pendant les exercices
-- **Vérification automatique** : Validez vos réponses instantanément
+`daspa-extension/` et `gas-addon/` couvrent des terrains où la même technique ne fonctionne pas :
+l'éditeur Google Docs rend son texte en canvas, un content script n'y a aucune prise. Le module
+complémentaire est donc un portage de `content.js`, avec un modèle d'interaction différent —
+l'élève **sélectionne** puis clique un bouton, au lieu de cliquer directement un mot.
+
+Les deux appellent le **même** backend. Toute évolution de l'un doit être répercutée sur l'autre :
+voir `CLAUDE.md` et le skill `parite-addon`.
+
+## Ce que fait l'extension
+
+**Traducteur mot à mot** — un clic affiche le sens dans la langue d'origine de l'élève, parmi une
+dizaine de langues d'origine fréquentes en classe d'accueil. Bulle au-dessus du mot, audio de la
+prononciation, ligatures françaises (œ, æ) gérées, liens protégés du clic accidentel.
+
+**Carnet de vocabulaire** — chaque mot consulté rejoint automatiquement une liste personnelle,
+conservée d'une session à l'autre. Sélection par cases à cocher, suppression groupée.
+
+**Aide à la compréhension** — un bouton ✨ le long des paragraphes de plus de 50 caractères produit
+un résumé de 30 mots maximum, puis une reformulation simplifiée où les termes ardus sont traduits.
+
+**Capture et déchiffrage d'image** — l'élève sélectionne une zone de l'écran ; Claude Vision en
+transcrit fidèlement le texte, traduit les mots difficiles et annote le résultat. Pensé pour les
+documents scannés et les manuels photographiés.
+
+**Sept exercices progressifs**, générés à partir du carnet personnel :
+
+1. **Associations** — relier chaque mot à sa traduction, avec lignes de connexion
+2. **Famille de mots** — carte qui se retourne au clic, saisie des dérivés au verso
+3. **Étiquettes** — glisser-déposer dans la phrase (seuil 70 %, correction locale)
+4. **Lecture** — texte cliquable, écoute **phrase par phrase**, puis enregistrement vocal aligné
+5. **Écoute et associe** — reconnaître le mot à l'oreille avant de l'associer
+6. **Défi** — texte à trous (seuil 70 %, reprise avec indice sur les seules erreurs)
+7. **Phrase avec le vocabulaire** — rédiger une phrase réemployant au moins la moitié des mots,
+   vérifiée par Claude mot par mot puis sur la grammaire d'ensemble
+
+**Test de lecture** — dix questions à choix multiples et un appariement, construits à partir du
+texte de la page. Score calculé immédiatement.
+
+**Lecteur PDF** — pdf.js intégré, traductions en annotations dans la marge droite, explications
+dans la marge gauche, repliables en bulles. Rendu virtualisé, zoom, ajustement à la largeur.
+
+**Deux thèmes** — Cyberpunk (fond sombre, néon) et Classica (crème, épuré), choisis au premier
+lancement et modifiables à tout moment.
+
+## Ce que fait le module complémentaire
+
+Le même périmètre, moins ce qui n'est pas transposable dans Apps Script : traduction sur sélection,
+carnet de vocabulaire, aide à la compréhension, les sept exercices et le test de lecture — dans des
+dialogues modaux plutôt que des surcouches de page. Thème Classica uniquement.
+
+Le test de lecture porte sur la **sélection** dans Docs (un document scolaire mêle plusieurs textes
+et consignes), sur toute la présentation dans Slides, et n'existe pas dans Sheets — un tableau
+n'est pas un texte suivi.
+
+Ni capture d'écran ni lecteur PDF : l'un comme l'autre supposent un accès au navigateur que le
+bac à sable d'Apps Script n'accorde pas.
+
+## Ce que fait l'application web
+
+Elle remplace l'ancien envoi de score vers une feuille de calcul.
+
+- Connexion Google, rôles `admin` / `teacher` / `student` en custom claims
+- Inscription des élèves par leur professeur : un compte non inscrit au préalable est refusé
+- Tableau de classe, fiche par élève avec ses sessions dépliables, vue élève de ses propres résultats
+- Zone d'administration : vue école, et **coût réel des appels Claude** mesuré en tokens
+
+La clef d'un compte est le **`sub` Google**, jamais l'e-mail : une adresse d'élève change et
+emporterait tout l'historique.
 
 ## Installation
 
-### Pour les développeurs
+### Élèves
 
-1. Clonez le dépôt :
+L'extension est distribuée en **privé** par le Chrome Web Store, aux comptes du domaine de
+l'établissement. Son installation est gérée par l'école.
+
+### Développement
+
 ```bash
 git clone https://github.com/jpbolle/daspalecte.git
 cd daspalecte
 ```
 
-2. Chargez l'extension dans Chrome :
-   - Ouvrez Chrome et allez dans `chrome://extensions/`
-   - Activez le "Mode développeur" (coin supérieur droit)
-   - Cliquez sur "Charger l'extension non empaquetée"
-   - Sélectionnez le dossier `daspalecte`
+**Extension** — `chrome://extensions/` → mode développeur → « Charger l'extension non empaquetée »
+→ sélectionner le dossier `daspa-extension/`.
 
-3. Configuration du backend (optionnel, pour la fonctionnalité IA) :
+> L'identifiant Chrome d'une copie non empaquetée dérive du **chemin absolu** du dossier : le
+> déplacer change l'identifiant, qu'il faut alors reporter dans les URI de redirection du client
+> OAuth et dans les origines autorisées de l'ingestion. Ne jamais ajouter de clef `"key"` au
+> manifeste pour figer l'identifiant : sur un profil géré par stratégie, Chrome refuse alors de
+> charger l'extension.
+
+**Application web**
+
 ```bash
-cd cloud-function
+cd daspa-app
 npm install
-# Déployez sur Google Cloud Functions avec votre clé API Claude
+npm run dev            # nécessite des identifiants ADC ; voir INIT.md
+npm test               # 48 tests (règles Firestore, ingestion, provisionnement)
 ```
 
-### Pour les utilisateurs finaux
+Les suites de tests exigent l'émulateur Firestore, donc un JDK.
 
-*L'extension sera bientôt disponible sur le Chrome Web Store.*
+**Module complémentaire** — développement avec `clasp` depuis `gas-addon/` (`clasp push`), jamais
+depuis l'éditeur web.
 
-## Utilisation
+**Paquet de publication**
 
-1. **Activer l'extension** : Cliquez sur l'icône Daspalecte dans votre barre d'outils
-2. **Ouvrir les outils** : Cliquez sur "Outils de lecture web"
-3. **Panneau latéral** : Le panneau apparaît sur le côté droit de votre page
-
-### Mode Traducteur
-1. Activez le toggle "Traducteur" dans le panneau
-2. Sélectionnez votre langue cible
-3. Cliquez sur n'importe quel mot de la page
-4. La traduction s'affiche au-dessus du mot
-5. Les mots traduits s'ajoutent automatiquement à votre liste
-
-### Mode Compréhension
-1. Activez le toggle "Compréhension" dans le panneau
-2. Sélectionnez votre langue maternelle
-3. Des boutons ✨ apparaissent sur les paragraphes
-4. Cliquez pour obtenir une version simplifiée avec traductions
-
-### Exercices
-1. Sélectionnez des mots dans votre liste de vocabulaire
-2. Cliquez sur "Générer des exercices"
-3. Complétez les 5 exercices interactifs
-4. Validez vos réponses et progressez
-
-## Structure du projet
-
-```
-daspalecte/
-├── daspa-extension/           # Extension Chrome
-│   ├── manifest.json
-│   ├── content.js / popup / sidepanel / pdfviewer / analytics.js
-│   └── package-extension.sh
-├── gas-addon/                 # Module Docs/Sheets/Slides (Apps Script)
-├── daspa-app/                 # App web de résultats (Next.js + Firebase)
-├── cloud-function/            # Backend Claude (hors git)
-├── firestore.rules            # Règles Firestore (racine)
-└── firebase.json              # App Hosting rootDir → daspa-app
+```bash
+./daspa-extension/package-extension.sh
 ```
 
-## Technologies utilisées
+Le script refuse de construire si le backend pointe sur localhost, si une clef `"key"` est revenue
+dans le manifeste, si un fichier JS a une erreur de syntaxe, ou s'il subsiste une **ressource
+distante** — une seule suffirait à classer l'extension en « code distant » au Chrome Web Store et à
+rallonger chaque examen de plusieurs jours.
 
-### Frontend
-- **JavaScript Vanilla** : Pas de frameworks, performances optimales
-- **Chrome Extensions API** : Storage, Runtime, Messaging
-- **Architecture iframe** : Isolation DOM pour le panneau latéral
-- **CSS3** : Animations, glassmorphism, thème cyberpunk néon
+## Architecture
 
-### Backend
-- **Google Cloud Functions** : Serverless
-- **Claude Sonnet 4.5** : Modèle IA de dernière génération (septembre 2025) pour simplifications et exercices
-- **Google Translate API** : Traductions mot à mot
-- **Google Secret Manager** : Sécurisation des clés API
-- **Node.js** : Runtime
+```
+Extension / Module complémentaire
+        │
+        ├──► Google Translate ............ traduction mot à mot
+        ├──► Cloud Run (europe-west1) ──► Claude Sonnet 4.5
+        │         summarize · generate_exercises · verify_sentence
+        │         generate_comprehension_test · analyze_screenshot
+        │
+        └──► App Hosting (europe-west4) ─► Firestore
+                  /api/ingest : résultats, vocabulaire, coûts d'appel
+```
 
-### Design
-- **Thème** : Neon Cyberpunk
-- **Couleurs** : Cyan (#00f3ff) et Violet clair (#e879f9)
-- **Polices** : Orbitron (titres), Inter (corps)
-- **Effets** : Glow, ombres portées, transitions fluides
+La clef API Anthropic vit dans Google Secret Manager, n'est lue que côté serveur et n'apparaît dans
+aucune réponse. L'URL de l'endpoint n'est pas publiée ici.
 
-## Langues supportées
+## Choix techniques
 
-### Langues de traduction (10 langues)
-- Arabe (ar)
-- Anglais (en)
-- Dari (fa)
-- Espagnol (es)
-- Pashto (ps)
-- Polonais (pl)
-- Roumain (ro)
-- Russe (ru)
-- Turc (tr)
-- Ukrainien (uk)
+**Extension et module complémentaire** : JavaScript vanilla, aucune étape de build, aucun
+framework. Les polices sont embarquées dans le paquet, comme les tables d'encodage de pdf.js — pas
+un octet n'est chargé depuis un CDN.
 
-### Langue d'interface et d'apprentissage
-- **Français** : Langue cible pour l'apprentissage FLE
+**Application web** : Next.js (App Router, TypeScript) et Tailwind — l'exception assumée.
 
-## Fonctionnalités techniques
+**Thèmes** : toutes les couleurs passent par des variables CSS `--t-*` définies dans `themes.css`.
+Les tokens Classica sont recopiés dans l'application web : si l'un bouge, l'autre suit.
 
-- **Support des ligatures françaises** : œ, æ correctement gérés
-- **Protection contre les clics accidentels** : Les liens sont désactivés pendant la traduction
-- **Persistance des données** : Chrome Local Storage
-- **Cache de traductions** : Évite les requêtes API redondantes
-- **Modes compatibles** : Traducteur et Compréhension peuvent fonctionner simultanément
-- **Gestion intelligente des exercices** : Désactivation temporaire du traducteur pendant les exercices
-- **Responsive** : Optimisé pour différentes tailles d'écran
-- **Robustesse** : Gestion des erreurs et fallbacks pour tous les types d'exercices
+**Audio** : `chrome.tts` côté extension — `speechSynthesis` gèle dans Chrome — et
+`speechSynthesis` côté Apps Script, où il fonctionne sans problème.
 
-## Configuration
+## Données
 
-Les paramètres sont stockés localement via Chrome Storage API :
-- `translatorEnabled` : État du traducteur
-- `selectedLanguage` : Langue de traduction active
-- `comprehensionEnabled` : État du mode compréhension
-- `nativeLanguage` : Langue maternelle de l'étudiant
+L'élève connecté transmet à la plateforme de son école, hébergée en Europe : son identifiant de
+compte Google, son adresse e-mail scolaire, les mots qu'il étudie et ses résultats. Les textes
+soumis à une reformulation ou à la génération d'un exercice sont traités par Claude (Anthropic) et
+Google Traduction. Rien n'est vendu ni exploité à des fins publicitaires.
 
-## API Backend
+Politique de confidentialité :
+<https://www.pedagokit.be/politiques-de-confidentialité-extensions-et-apps/daspalecte>
 
-L'extension utilise un backend sécurisé hébergé sur **Google Cloud Run** (région Europe-West1) pour :
+## Feuille de route
 
-**1. Aide à la compréhension** (`summarize`)
-- Génère un résumé (max 30 mots) + reformulation complète
-- Ajoute des traductions entre parenthèses pour les mots difficiles
-- Retour JSON : `{summary: "...", reformulation: "..."}`
-
-**2. Génération d'exercices** (`generate_exercises`)
-- Crée 5 exercices progressifs en français
-- Types : matching, family, tags, reading, cloze
-- Adapté au niveau FLE avec traductions d'aide
-
-**Note** : L'URL de l'endpoint n'est pas publique pour éviter les abus et protéger les quotas API.
-
-## Développement
-
-### Prérequis
-- Google Chrome 88+
-- Node.js 16+ (pour le backend)
-- Compte Google Cloud (pour déploiement backend)
-- Clé API Claude (Anthropic)
-
-### Tests
-Utilisez `test-ligatures.html` pour tester le support des ligatures françaises.
-
-## Contribution
-
-Les contributions sont les bienvenues ! N'hésitez pas à :
-1. Forker le projet
-2. Créer une branche (`git checkout -b feature/amelioration`)
-3. Commiter vos changements (`git commit -m 'Ajout fonctionnalité'`)
-4. Pousser vers la branche (`git push origin feature/amelioration`)
-5. Ouvrir une Pull Request
+- Adaptation par niveau CECR (A1 à C2)
+- Suivi pédagogique : historique, révisions espacées, statistiques de progression
+- Outil de prononciation : comparaison entre le mot prononcé et le mot attendu
+- Génération d'un test à partir d'une vidéo YouTube, puis d'une application de préparation de
+  contenu par le professeur
+- Ingestion des résultats du module complémentaire (phase 5)
 
 ## Auteur
 
-**PedagokIT**
+**PedagokIT** — Jean-Philippe Bolle, Collège Notre-Dame de Dinant.
 
-## Licence
-
-MIT License - voir le fichier LICENSE pour plus de détails
+Projet développé pour les besoins d'un établissement scolaire et distribué à ses élèves. Aucune
+licence ouverte n'y est attachée à ce jour.
 
 ## Remerciements
 
-- Anthropic (Claude API)
-- Google Cloud Platform
-- Tous les enseignants FLE et étudiants DASPA
-
----
-
-## Objectifs à venir
-
-### Lecture de PDF en ligne
-- **Support des PDF** : Permettre l'utilisation de tous les outils (traducteur, compréhension, exercices, test de lecture) sur les PDF ouverts dans le navigateur
-- **Extraction de texte** : Récupérer le contenu textuel des PDF pour l'analyser
-
-### Interface améliorée
-- **Adaptation par niveau** : Choix du niveau CECR (A1 à C2) pour adapter la complexité des exercices et simplifications
-
-### Fonctionnalités pédagogiques
-- **Historique d'apprentissage** : Suivi des mots appris et des exercices complétés
-- **Révisions espacées** : Système de répétition pour mémorisation à long terme
-- **Statistiques de progression** : Tableaux de bord pour élèves et enseignants
+Anthropic (Claude), Google Cloud Platform, et les enseignants et élèves qui essuient les plâtres.
 
 ---
 

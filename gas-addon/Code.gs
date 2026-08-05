@@ -386,6 +386,18 @@ function getActiveUi_() {
  * Chrome : summarize, generate_exercises, generate_comprehension_test,
  * verify_tags_answers, verify_sentence, send_score). Appele depuis la sidebar via
  * google.script.run.callCloudFunction(payload).
+ *
+ * POINT DE REPRISE — mesure du cout des appels a Claude.
+ * Depuis l'instrumentation du backend, chaque reponse porte un en-tete
+ * `X-Daspalecte-Usage` : {model, in, out, cacheRead, cacheWrite}. L'extension le
+ * lit et l'envoie a l'app web sous forme d'evenement `ai_call`
+ * (daspa-extension/content.js:trackAiUsage). L'add-on ne le fait PAS encore,
+ * parce qu'il n'ingere rien du tout : il faut d'abord rattacher ce projet Apps
+ * Script au projet GCP `essai-27712` et ajouter son client OAuth a
+ * ALLOWED_AUDIENCES (phase 5 du chantier app web). Tant que ce n'est pas fait,
+ * la consommation du module complementaire n'apparait pas dans les couts de la
+ * zone Administration — c'est dit explicitement a l'ecran.
+ * Ici, la lecture se ferait avec response.getAllHeaders()['X-Daspalecte-Usage'].
  */
 function callCloudFunction(payload) {
   const response = UrlFetchApp.fetch(CLOUD_FUNCTION_URL, {

@@ -1,11 +1,10 @@
 {
   "manifest_version": 3,
   "name": "Daspalecte",
-  "version": "2.0",
-  "description": "Aide à la lecture et compréhension pour élèves DASPA.",
+  "version": "2.0.1",
+  "description": "Aide les élèves allophones à lire et à comprendre le français, sur une page web comme dans un PDF.",
   "permissions": [
     "storage",
-    "activeTab",
     "tabs",
     "identity",
     "tts",

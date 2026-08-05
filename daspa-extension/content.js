@@ -20,6 +20,9 @@ class DaspalecteTranslator {
         this.studentEmail = '';
         this.currentTheme = 'cyberpunk';
         this.readingRate = 0.85; // vitesse de lecture de l'exercice "Lecture" (synthèse vocale)
+        // Consigne de l'exercice "Lecture", imposée plutôt que reprise de la réponse de Claude :
+        // lui ne connaît pas le déroulé réel de l'exercice. Identique au module complémentaire.
+        this.READING_INSTRUCTION = 'Lisez ce court texte en français, chaque mot est cliquable, puis faites attention à la prononciation des mots...';
         this.initTheme();
         this.init();
     }
@@ -1435,6 +1438,8 @@ class DaspalecteTranslator {
                 })
             });
 
+            this.trackAiUsage('summarize', response);
+
             if (!response.ok) {
                 const errorData = await response.json();
                 console.error('[CONTENT] Erreur backend détaillée:', errorData);
@@ -1485,6 +1490,8 @@ class DaspalecteTranslator {
                 })
             });
 
+            this.trackAiUsage('generate_exercises', response);
+
             if (!response.ok) {
                 const errorData = await response.json();
                 console.error('[CONTENT] Erreur backend détaillée:', errorData);
@@ -1504,6 +1511,10 @@ class DaspalecteTranslator {
                 orderedExercises.splice(insertAt, 0, listeningEx);
             }
             orderedExercises.push(this.buildSentenceExercise(words));
+            // La consigne de la lecture est imposée côté client : Claude ne connaît pas le déroulé
+            // réel de l'exercice (texte cliquable, puis écoute phrase par phrase, puis
+            // enregistrement) et en décrivait un autre.
+            orderedExercises.forEach(e => { if (e.type === 'reading') e.description = this.READING_INSTRUCTION; });
             this.renumberExerciseTitles(orderedExercises);
 
             this.displayExercises(orderedExercises, words, targetLang);
@@ -1724,6 +1735,7 @@ class DaspalecteTranslator {
                             targetLanguage: targetLang
                         })
                     });
+                    this.trackAiUsage('generate_exercises', response);
                     if (!response.ok) throw new Error('Erreur lors de la régénération');
                     const data = await response.json();
                     const currentType = exercises[currentStep].type;
@@ -2074,10 +2086,12 @@ class DaspalecteTranslator {
         const resultEl = container.querySelector('#tags-result');
 
         btnCheck.style.display = 'block';
-        btnCheck.onclick = async () => {
-            btnCheck.disabled = true;
+        btnCheck.onclick = () => {
+            // Correction strictement locale : les étiquettes viennent d'un pool fermé, l'élève ne
+            // peut donc écrire aucun synonyme à arbitrer. L'appel à Claude (`verify_tags_answers`)
+            // qui existait ici a été retiré — le module complémentaire s'en passe depuis toujours,
+            // et un aller-retour réseau pour un pool fermé coûtait un appel sans rien trancher.
             let correctCount = 0;
-            const wrongItems = []; // réponses ne correspondant pas au mot exact attendu
 
             ex.items.forEach((item, idx) => {
                 const zone = container.querySelector(`.drop-zone[data-idx="${idx}"]`);
@@ -2094,43 +2108,9 @@ class DaspalecteTranslator {
                     correctCount++;
                 } else {
                     zone.classList.add('error');
-                    if (answers[idx]) {
-                        wrongItems.push({ zone, sentence: item.sentence.replace('___', answers[idx]) });
-                    }
                 }
             });
 
-            // Un mot différent du mot exact attendu peut être un synonyme valide (ex. "hommes"/"personnes") :
-            // on demande un second avis à Claude avant de trancher, plutôt que de rejeter en bloc.
-            if (wrongItems.length > 0) {
-                resultEl.style.display = 'block';
-                resultEl.innerHTML = '<p class="ex-score">Claude vérifie tes réponses...</p>';
-                try {
-                    const response = await fetch('https://daspalecte-1086562672385.europe-west1.run.app', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({
-                            action: 'verify_tags_answers',
-                            items: wrongItems.map(w => ({ sentence: w.sentence }))
-                        })
-                    });
-                    if (response.ok) {
-                        const data = await response.json();
-                        (data.results || []).forEach((result, i) => {
-                            if (result && result.valid) {
-                                wrongItems[i].zone.classList.remove('error');
-                                wrongItems[i].zone.classList.add('correct');
-                                correctCount++;
-                            }
-                        });
-                    }
-                } catch (error) {
-                    console.error('[CONTENT] Erreur vérification IA des étiquettes:', error);
-                    // Pas de blocage : on garde le résultat de la vérification stricte en cas d'échec
-                }
-            }
-
-            btnCheck.disabled = false;
             const accuracy = totalItems > 0 ? correctCount / totalItems : 1;
 
             if (accuracy >= 0.7) {
@@ -2138,8 +2118,8 @@ class DaspalecteTranslator {
                 markCompleted({ score: correctCount, total: totalItems });
                 btnCheck.style.display = 'none';
                 // .ex-result a un `display: flex !important` en CSS qui écraserait un simple
-                // style.display = 'none' : la boîte resterait visible avec son dernier contenu
-                // (ex. "Claude vérifie tes réponses..."). setProperty(...'important') est nécessaire.
+                // style.display = 'none' : la boîte resterait visible avec le verdict de la
+                // tentative précédente. setProperty(...'important') est nécessaire.
                 resultEl.style.setProperty('display', 'none', 'important');
                 resultEl.innerHTML = '';
             } else {
@@ -2382,7 +2362,7 @@ class DaspalecteTranslator {
         container.innerHTML = `
             <div class="family-exercise">
                 <div class="families-grid" id="families"></div>
-                <p class="ex-hint" id="family-hint">Retourne chaque carte (🔄) pour tester tes connaissances, puis clique sur « Vérifier ». Tu peux revoir le recto à tout moment.</p>
+                <p class="ex-hint" id="family-hint">Clique sur chaque carte pour la retourner et tester tes connaissances, puis clique sur « Vérifier ». Tu peux revoir le recto à tout moment.</p>
                 <div class="ex-result" id="family-result" style="display:none;"></div>
             </div>
         `;
@@ -2405,15 +2385,13 @@ class DaspalecteTranslator {
             card.dataset.idx = cardIdx;
             card.innerHTML = `
                 <div class="family-card-inner">
-                    <div class="family-card-front">
-                        <button type="button" class="family-flip-icon-btn family-flip-btn" title="Tester mes connaissances" aria-label="Tester mes connaissances">🔄</button>
+                    <div class="family-card-front" role="button" tabindex="0" aria-label="Retourner la carte pour tester mes connaissances">
                         <div class="main-word-node">${mainWord}</div>
                         <div class="related-words-container">
                             ${item.related.map(word => `<span class="related-tag" data-word="${word}">${word}</span>`).join('')}
                         </div>
                     </div>
                     <div class="family-card-back">
-                        <button type="button" class="family-flip-icon-btn family-flip-back-btn" title="Revoir le recto" aria-label="Revoir le recto">🔄</button>
                         <div class="main-word-node">${mainWord}</div>
                         <div class="family-inputs-container">
                             ${item.related.map((word, i) => `<input type="text" class="family-input" placeholder="Mot lié ${i + 1}" autocomplete="off">`).join('')}
@@ -2423,19 +2401,30 @@ class DaspalecteTranslator {
             `;
             familiesDiv.appendChild(card);
 
-            card.querySelector('.family-flip-btn').addEventListener('click', (e) => {
-                e.stopPropagation();
+            // Plus de bouton 🔄 : c'est la carte elle-même qui se retourne au clic, comme dans le
+            // module complémentaire. Au verso, les champs de saisie doivent rester utilisables
+            // sans replier la carte.
+            const flipToBack = () => {
                 card.classList.add('flipped');
                 flippedOnce.add(cardIdx);
                 if (flippedOnce.size === totalCards) {
                     hintEl.style.display = 'none';
                     btnCheck.style.display = 'block';
                 }
+            };
+
+            const front = card.querySelector('.family-card-front');
+            front.addEventListener('click', flipToBack);
+            front.addEventListener('keydown', (e) => {
+                if (e.key === 'Enter' || e.key === ' ') {
+                    e.preventDefault();
+                    flipToBack();
+                }
             });
 
             // Toujours possible de revoir le recto (exercice formatif, pas de pénalité)
-            card.querySelector('.family-flip-back-btn').addEventListener('click', (e) => {
-                e.stopPropagation();
+            card.querySelector('.family-card-back').addEventListener('click', (e) => {
+                if (e.target.closest('.family-input')) return;
                 card.classList.remove('flipped');
             });
         });
@@ -2763,6 +2752,8 @@ class DaspalecteTranslator {
             })
         });
 
+        this.trackAiUsage('verify_sentence', response);
+
         if (!response.ok) {
             const errorData = await response.json().catch(() => ({}));
             throw new Error(errorData.message || 'Erreur lors de la vérification de la phrase');
@@ -2843,6 +2834,8 @@ class DaspalecteTranslator {
                     nativeLanguage: nativeLanguage || this.nativeLanguage
                 })
             });
+
+            this.trackAiUsage('generate_comprehension_test', response);
 
             if (!response.ok) {
                 const errorData = await response.json();
@@ -3326,6 +3319,41 @@ class DaspalecteTranslator {
     }
 
     /**
+     * Enregistre le coût d'un appel à Claude, lu dans l'en-tête que pose la
+     * Cloud Function (`X-Daspalecte-Usage`).
+     *
+     * Un événement distinct plutôt qu'un champ ajouté aux événements
+     * pédagogiques : un appel ne correspond pas à une activité. Les sept
+     * exercices d'une session viennent d'UNE seule génération, une vérification
+     * de phrase ne produit aucun exercice, et une régénération coûte sans rien
+     * ajouter au parcours de l'élève. Compter les appels à part est le seul
+     * moyen d'avoir un total juste.
+     *
+     * Silencieux si l'en-tête est absent : c'est le cas tant que le backend
+     * instrumenté n'est pas déployé, et sur toute réponse d'erreur.
+     */
+    trackAiUsage(action, response) {
+        try {
+            const raw = response && response.headers
+                ? response.headers.get('X-Daspalecte-Usage')
+                : null;
+            if (!raw) return;
+
+            const usage = JSON.parse(raw);
+            this.track('ai_call', {
+                action,
+                model: usage.model || null,
+                inputTokens: usage.in || 0,
+                outputTokens: usage.out || 0,
+                cacheReadTokens: usage.cacheRead || 0,
+                cacheWriteTokens: usage.cacheWrite || 0
+            });
+        } catch (error) {
+            console.debug('[CONTENT] usage Claude illisible:', error);
+        }
+    }
+
+    /**
      * Enregistre la réussite d'un exercice. Appelé une seule fois par exercice,
      * depuis `markCompleted` (voir displayExercises).
      */
@@ -3702,6 +3730,8 @@ class DaspalecteTranslator {
                     nativeLanguage: this.nativeLanguage
                 })
             });
+
+            this.trackAiUsage('analyze_screenshot', response);
 
             if (!response.ok) {
                 const errorData = await response.json();

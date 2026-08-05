@@ -99,6 +99,15 @@ service cloud.firestore {
       allow write: if false;
     }
 
+    // --- Appels a Claude (tokens consommes) --------------------------------
+    // Meme portee que les autres resultats : l'eleve concerne, son prof, et
+    // l'admin. Les totaux par ecole et par prof sont calcules cote serveur
+    // (Admin SDK), ces regles ne couvrent que la lecture directe.
+    match /aiCalls/{callId} {
+      allow read: if canReadStudentData(resource.data.studentId, resource.data.teacherId);
+      allow write: if false;
+    }
+
     // Tout le reste est ferme.
     match /{document=**} {
       allow read, write: if false;

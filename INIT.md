@@ -30,8 +30,8 @@ Une extension Chrome d'aide à la lecture pour les élèves **FLE** (Français L
 ### 5. Generation d'exercices
 7 types progressifs a partir des mots de vocabulaire collectes, avec seuils de reussite et navigation par points (dots) cliquables si exercice deja reussi ou si c'est le tout premier exercice non encore fait (retour arriere ne force plus a refaire, et n'empeche plus d'avancer directement au suivant) :
 1. **Associations** — relier mot francais / traduction (correction immediate paire par paire, pas de seuil), lignes SVG de connexion entre les paires trouvees (comme le test de lecture)
-2. **Famille de mots** — carte a effet flip (icone 🔄 seule, recto toujours accessible), saisie des mots lies au verso, traduction au survol des etiquettes recto, seuil : au moins 2 mots trouves
-3. **Etiquettes** — glisser-deposer le bon mot dans la phrase (+ fallback clic/clavier), seuil 80%, bouton "Regenerer" (rappelle Claude) si en dessous, **verification des synonymes par Claude** si une reponse est jugee fausse (evite de rejeter des synonymes valides)
+2. **Famille de mots** — carte a effet flip (**la carte entiere se retourne au clic**, recto toujours accessible ; le verso ne se replie pas quand on clique dans un champ), saisie des mots lies au verso, traduction au survol des etiquettes recto, seuil : au moins 2 mots trouves
+3. **Etiquettes** — glisser-deposer le bon mot dans la phrase (+ fallback clic/clavier), seuil 70%, bouton "Regenerer" (rappelle Claude) si en dessous. **Correction strictement locale** : les etiquettes viennent d'un pool ferme, l'eleve ne peut ecrire aucun synonyme a arbitrer (l'appel `verify_tags_answers` a ete retire des deux implementations le 2026-08-05)
 4. **Lecture** — revelation progressive : texte silencieux cliquable (traduction mot-a-mot) → apres 20s, un bouton d'ecoute individuel apparait **par phrase** (plutot qu'un seul bouton pour tout le texte, pour eviter la derive de synchronisation sur les textes longs), avec pause estimee apres chaque signe de ponctuation forte → une fois **toutes** les phrases ecoutees au moins une fois, section Enregistrer (reconnaissance vocale + alignement pour feedback vert/rouge sur le texte entier), passage a la suite impossible sans enregistrement
 5. **Ecoute et associe** — meme mecanique que l'exercice 1 (Associations), mais la colonne francaise n'affiche pas le texte : seulement un bouton 🔊 par mot, l'eleve doit reconnaitre le mot a l'oreille avant de l'associer a sa traduction
 6. **Defi** — texte a trous, seuil 70%, bouton "Recommencer avec indice" (premiere syllabe) si en dessous, **l'indice ne concerne que les reponses fausses de la tentative precedente**, pas les bonnes
@@ -173,7 +173,15 @@ Google Cloud Console
 
 ### Backend (Cloud Function, hors de ce repo)
 - Nouvelle action `verify_tags_answers` ajoutee dans `index.js` (Cloud Run "daspalecte", projet `vocabulaire-469115`, region europe-west1) : demande a Claude si une phrase completee par l'eleve reste valide meme si le mot ne correspond pas exactement au mot attendu (evite de rejeter des synonymes) — deployee et testee avec succes
-- Ce code n'a pas de copie locale dans ce repo, uniquement accessible via Google Cloud Console → Cloud Run → onglet Source (editeur en ligne fragile a l'automatisation : prefer telecharger l'archive, corriger en local avec `node --check`, puis coller un diff minimal)
+- ~~Uniquement accessible via l'editeur en ligne de Cloud Console~~ — **obsolete depuis le 2026-08-04** : il y a une copie locale dans `cloud-function/` (gitignoree) et gcloud est installe, donc le deploiement se fait en une commande depuis cette copie :
+
+  ```
+  cd cloud-function
+  gcloud run deploy daspalecte --source . --function daspalecteSummary \
+    --region europe-west1 --project vocabulaire-469115
+  ```
+
+  `gcloud run deploy` **conserve tout ce qui n'est pas precise** (variables d'environnement, compte de service qui lit Secret Manager, acces public) : redeployer ne reconfigure rien. Deux precautions : `node --check index.js` avant, et se souvenir que la copie locale ecrase la version en ligne — en cas de doute sur une divergence, comparer avant de deployer. `gcloud auth login` est requis **en plus** de `gcloud auth application-default login` (deux jeux d'identifiants distincts)
 - Exercice 6 (phrase avec le vocabulaire) reste bloque sur le meme type de dependance backend, reporte
 
 ### Skill impeccable
@@ -391,18 +399,135 @@ Consequence voulue : **un eleve n'a pas besoin d'ouvrir l'app web.** Son premier
 - **Fiche reecrite** : l'ancienne annoncait « Aucune collecte de donnees personnelles », ce qui est faux depuis `analytics.js`. Elle annoncait aussi 5 exercices (il y en a 7) et l'envoi du score « a l'enseignant » via Sheets
 - **Utilisation des donnees** : cocher **Historique Web** est obligatoire — chaque evenement transporte `context: {url, title}` plus un horodatage, ce qui correspond mot pour mot a la definition Google. Cochees aussi : informations personnelles, activite de l'utilisateur, contenu du site web
 - **Code distant = Oui** : les polices sont chargees depuis `fonts.googleapis.com` (`popup.html`, `sidepanel.html`, `pdfviewer.css`). Les embarquer localement ferait passer a « Non » et eviterait l'examen approfondi a chaque mise a jour — piste pour plus tard
-- **Politique de confidentialite** : `https://www.pedagokit.be/politiques-de-confidentialité-extensions-et-apps/daspalecte` (Google Sites, **penser au bouton Publier**, l'editeur ne suffit pas). Le fichier `daspa-extension/privacy-policy.html` du repo est **obsolete** (il decrit encore le flux Google Sheets) et n'est heberge nulle part — a supprimer ou a resynchroniser
+- **Politique de confidentialite** : `https://www.pedagokit.be/politiques-de-confidentialité-extensions-et-apps/daspalecte` (Google Sites, **penser au bouton Publier**, l'editeur ne suffit pas). Le fichier `daspa-extension/privacy-policy.html` du repo, obsolete (il decrivait encore le flux Google Sheets) et heberge nulle part, a ete **supprime le 2026-08-05** : la politique publiee est desormais la seule source. Elle a ete verifiee le meme jour et couvre bien les quatre categories de donnees cochees dans la fiche, et nomme Anthropic et Google Traduction comme sous-traitants
 - **Decision utilisateur** : la connexion au compte n'est plus presentee comme facultative, l'eleve doit se connecter. **Mais rien ne le force cote logiciel** aujourd'hui : sans compte, les evenements s'empilent simplement dans la file locale. Verrouiller le panneau tant qu'aucun compte n'est connecte reste a faire si on veut que le logiciel corresponde a la consigne
+
+### Interface admin : zone Administration et cout des appels Claude (2026-08-04)
+
+Deux zones dans l'en-tete pour `jeanphilippe.bolle@cnddinant.be`, qui est **prof et admin a la fois** :
+
+- **« Mes eleves »** (`/prof`) — sa classe de francais, exactement ce que voit un collegue
+- **« Administration »** (`/admin`) — l'ecole entiere, avec une sous-navigation : Vue d'ensemble, Eleves, Professeurs
+
+#### Le bug de portee qui motivait tout
+
+`listStudents`, `listPendingInvitations` et `loadClassActivity` basculaient sur le **role** : un admin voyait tous les eleves de l'ecole sur une page titree « Mes eleves », sans moyen de revenir a sa classe. Indolore tant qu'il n'y a qu'un prof, cassant des le deuxieme. Ces fonctions prennent desormais un **`teacherId` explicite** (`listStudentsFor(uid)`, `loadClassActivity(scope, ids)`), et les vues ecole sont des fonctions distinctes (`listAllStudents`, `loadAiUsage(null)`) appelees seulement depuis `/admin`. Le garde-fou de role vit une seule fois, dans `(app)/admin/layout.tsx`.
+
+#### Mesure du cout : tokens reels, pas estimation
+
+Chaine complete, en trois maillons :
+
+1. **Cloud Function** (`cloud-function/index.js`) : `setUsageHeader()` renvoie `X-Daspalecte-Usage` = `{model, in, out, cacheRead, cacheWrite}` lu dans `response.data.usage`. **En-tete et non corps de reponse** : le corps EST le JSON de Claude, que l'extension et l'add-on parsent tel quel (`data.exercises`, `data.summary`) — y ajouter une clef ferait courir un risque a des clients deja publies, alors qu'un en-tete inconnu est ignore. Necessite `Access-Control-Expose-Headers`, sinon le navigateur cache l'en-tete au code appelant.
+2. **Extension** (`content.js:trackAiUsage`) : lit l'en-tete et emet un evenement **`ai_call`** distinct des evenements pedagogiques. Pourquoi distinct : les 7 exercices d'une session viennent d'**UN seul** appel `generate_exercises`, une verification de phrase ne produit aucun exercice, et une regeneration coute sans rien ajouter au parcours. Compter les appels a part est le seul moyen d'avoir un total juste. Appele sur les 7 sites de `fetch` de `content.js` (aucun autre fichier de l'extension n'appelle le backend).
+3. **App** : `aiCalls` (collection de premier niveau, `studentId`/`teacherId` denormalises comme ailleurs), agregee par `loadAiUsage(scope)` en total / par action / par eleve / par prof.
+
+**Le cout n'est pas stocke** (`daspa-app/src/lib/ai-cost.ts`) : on garde les tokens (un fait mesure) et on recalcule a l'affichage (une convention tarifaire qui changera). Un tarif figé en base rendrait tout l'historique faux le jour d'une revision. Tarifs Sonnet 4.5 : 3 $/M entree, 15 $/M sortie, 3,75 $/M ecriture de cache, 0,30 $/M lecture de cache.
+
+**Limite affichee a l'ecran, a ne pas oublier** : le total ne couvre que les appels d'**eleves connectes**. Sont invisibles : les appels du module complementaire (il n'ingere rien, phase 5 — point de reprise documente dans `gas-addon/Code.gs:callCloudFunction`), et ceux passes sans compte (endpoint Cloud Run public).
+
+**48 tests** desormais (`cd daspa-app && npm test`) : 29 sur les regles Firestore, 12 sur l'ingestion, 7 sur le provisionnement des comptes.
+
+#### Inscription d'un eleve : prenom, nom, classe
+
+Le formulaire « Inscrire un eleve » collecte desormais **prenom**, **nom** et **classe** (seul l'email reste obligatoire ; le champ classe ne s'affiche pas pour l'inscription d'un professeur).
+
+- `displayName` n'est plus saisi mais **reconstitue** cote serveur depuis prenom + nom : un seul champ a maintenir, ordre coherent partout
+- **Attention** : au premier login, le nom du compte Google **ecrase** `displayName` (`resolveAccount`). Le nom saisi par le prof ne sert donc qu'a identifier l'invitation avant la premiere connexion — c'est voulu, Google est plus a jour
+- La **classe**, elle, n'est jamais ecrasee : Google ne la connait pas. Elle vit sur l'invitation (`InvitationDoc.schoolClass`), est recopiee sur `UserDoc.schoolClass` au premier login, et ne bouge plus
+- Nommee `schoolClass` et non `className` — dans une base React, `className` preterait a confusion
+- Affichee a trois endroits : pastille sur les invitations en attente, sous le nom dans les cartes eleves de `/prof`, colonne « Classe » dans `/admin/eleves`
+- Les comptes et invitations anterieurs n'ont pas le champ (**absent**, pas `null`) : tout l'affichage passe par `?? null` / `?? "—"`, et un test couvre ce cas
+
+### Developpement local sans emulateur (2026-08-04)
+
+`npm run dev` depuis `daspa-app/` (le monorepo n'a **pas** de `package.json` a la racine — `npm run dev` a la racine echoue en « Missing script »), avec `NEXT_PUBLIC_USE_FIREBASE_EMULATORS=false` et des identifiants ADC : `gcloud auth application-default login`.
+
+**Piege qui coute une heure** : ces identifiants sont de type `authorized_user`. Firestore les accepte tels quels, **l'API Auth d'administration non** — elle exige un projet de quota declare. Sans lui, `verifyIdToken(idToken, true)` (route `/api/auth/session`) leve, la route renvoie `invalid_token` et la connexion echoue en **401** sans autre indice, les seuls messages visibles dans la console etant le bruit COOP de Google. Correctif, une fois pour la machine :
+
+```
+gcloud auth application-default set-quota-project essai-27712
+```
+
+Puis **redemarrer le serveur** : le SDK Admin garde ses identifiants en memoire depuis le demarrage du processus.
+
+Autre piege rencontre : un `next dev` fossile lance depuis l'ancien dossier `web/` tenait le port 3000 et se relancait tout seul — tuer l'enfant ne suffit pas, il faut tuer le parent (`kill -9 <parent> <enfant>`).
+
+Le jeu de donnees de demonstration (`npm run seed`, emulateur obligatoire) couvre desormais les nouveaux ecrans : evenements `ai_call` avec des ordres de grandeur realistes (**un seul** `generate_exercises` par session, ce qui est tout le propos du modele), et deux eleves rattaches a `ADMIN_EMAIL` pour que « Mes eleves » ne soit pas vide cote admin. Le seed relit l'identifiant reel de l'admin par email avant de nettoyer : l'emulateur Auth genere un `sub` imprevisible, donc **relancer le seed apres la premiere connexion** pour que la classe apparaisse.
 
 ### Reste a faire
 
+- **Deployer les regles Firestore** (`firebase deploy --only firestore:rules`) : la collection `aiCalls` y est ajoutee, sans quoi toute lecture directe depuis le navigateur est refusee (les pages, elles, passent par l'Admin SDK et fonctionnent quand meme)
+- ~~Deployer la Cloud Function instrumentee~~ — **fait le 2026-08-04**, revision `daspalecte-00027-59d`, verifie par un appel reel : la reponse porte bien `x-daspalecte-usage: {"model":"claude-sonnet-4-5-20250929","in":412,"out":86,...}` et `access-control-expose-headers`, corps de reponse inchange
+- **Reconstruire et resoumettre l'extension** pour que `trackAiUsage` parte chez les eleves (la 2.0 est en examen depuis le 2026-08-04 : soit attendre son acceptation, soit soumettre une 2.0.1)
 - **Verifier le flux de bout en bout avec un vrai compte eleve.** Attention : `jeanphilippe.bolle@cnddinant.be` est provisionne en **admin**, donc `/api/ingest` repond `{ok: true, ignored: "not_a_student"}` — c'est la preuve que la chaine jeton + CORS + resolution de compte fonctionne, mais aucune donnee n'est ecrite. Il faut un compte inscrit comme eleve pour voir des sessions apparaitre
 - ~~Basculer `DEFAULT_API_BASE`~~ — fait le 2026-08-04, `analytics.js` pointe sur `https://daspalecte.edukids.pedagokit.be`. `daspalecteApiBase` dans `chrome.storage.local` permet toujours de surcharger sans reconstruire
 - **Phase 5 — add-on Apps Script** : l'`aud` d'un token Apps Script est le client OAuth du projet GCP associe au script ; il faudra rattacher le projet Apps Script a `essai-27712` et ajouter cette audience a `ALLOWED_AUDIENCES`
 - Retirer `sendScoreToTeacher` et l'URL `script.google.com` de `content.js` une fois le nouveau flux verifie (l'envoi vers la Sheet est **conserve en parallele** pendant la transition, un TODO le signale dans le code)
 - ~~Activer le plan Blaze et deployer sur App Hosting~~ — fait
 - **Verrouiller l'usage sans compte** si la connexion doit vraiment etre obligatoire (voir la section publication Web Store ci-dessus)
-- **Embarquer les polices localement** pour sortir de la categorie « code distant » et raccourcir les examens du Web Store
+- ~~Embarquer les polices localement~~ — **fait le 2026-08-05** (voir ci-dessous)
+
+## Refus du Chrome Web Store et version 2.0.1 (2026-08-05)
+
+La version 2.0 a ete **refusee** le 2026-08-05 pour « accumulation de mots cles » (`Yellow Argon`).
+Aucun code n'etait en cause : la description de la fiche enumerait les 11 langues de traduction en
+toutes lettres. Google plafonne a **5 elements** toute enumeration de sites, marques ou langues, et
+a **5 occurrences** d'un meme mot cle dans la description.
+
+- **La fiche est desormais archivee dans le repo** : `daspa-extension/store-listing.md` porte la
+  description longue, le tableau de comptage des mots cles a verifier avant chaque soumission, les
+  cases « utilisation des donnees » a cocher et la regle qui a cause le refus. Le tableau de bord
+  Web Store ne garde aucun historique — sans cette copie, la lecon se reperd
+- **Aucune langue n'est plus nommee** dans le texte. La liste complete a sa place dans une
+  **capture d'ecran promotionnelle**, ce que Google autorise explicitement
+
+### Polices embarquees — et la dependance cachee qu'elles ont revelee
+
+- 7 fichiers `woff2` dans `daspa-extension/fonts/` (256 ko), declares par `fonts.css` charge avant
+  `themes.css` dans les trois pages. Les 4 references a `fonts.googleapis.com` ont disparu
+- **Le sous-ensemble cyrillique d'Inter est conserve** : le carnet de vocabulaire affiche des
+  traductions en russe et en ukrainien, qui seraient retombees sur la police systeme. Arabe, dari,
+  pashto et kurde ne sont couverts par aucune de ces trois familles — deja le cas avant, inchange
+- **`package-extension.sh` refuse desormais de construire** s'il reste une ressource distante
+  (`fonts.googleapis.com`, `fonts.gstatic.com`, un CDN). Ce garde-fou a immediatement attrape une
+  **seconde dependance insoupconnee** : `pdfviewer.js` chargeait les tables d'encodage de pdf.js
+  depuis `cdn.jsdelivr.net`. Embarquees dans `lib/cmaps/` (1,6 Mo, 169 fichiers), servies par
+  `chrome.runtime.getURL()`. **Sans cela, declarer « code distant : Non » aurait ete faux** et
+  l'extension aurait ete refusee une seconde fois. Elles ne servent qu'aux PDF a encodage CID
+  (chinois, japonais, coreen), qui se seraient affiches en carres vides si on les avait simplement
+  supprimees
+- Paquet `daspalecte-2.0.1.zip` : 3,7 Mo (contre 2,5 Mo en 2.0)
+
+## Parite extension / module complementaire — audit du 2026-08-05
+
+Audit croise complet des deux implementations. **La parite est bien meilleure qu'attendu** : les 9
+helpers partages (`normalizeSentenceWord`, `stripGenderNumber`, `wordMatchKey`,
+`sameVocabularyWord`, `splitIntoSentences`, `getFirstSyllableHint`,
+`buildListeningMatchingExercise`, `buildSentenceExercise`, `renumberExerciseTitles`) sont
+**strictement identiques** a la syntaxe de declaration pres. La refonte de la lecture phrase par
+phrase, les lignes SVG d'appariement, les points de navigation, les seuils et le format enrichi de
+`verify_sentence` sont portes des deux cotes.
+
+Trois divergences reelles ont ete trouvees, **deux dans le sens add-on → extension** (des
+ameliorations validees dans l'add-on n'etaient jamais remontees) :
+
+1. **Consigne de l'exercice Lecture** — l'add-on imposait `READING_INSTRUCTION` cote client,
+   l'extension reprenait la description de Claude, qui ne connait pas le deroule reel (texte
+   cliquable → ecoute phrase par phrase → enregistrement) et en decrivait un autre. Porte dans
+   `content.js` (constante dans le constructeur, appliquee juste avant `renumberExerciseTitles`)
+2. **Famille de mots** — l'add-on retourne la carte entiere au clic, l'extension avait encore le
+   bouton 🔄. Porte : `role="button"` + `tabindex` + clavier sur le recto, clic hors des champs
+   pour revenir au recto, `cursor: pointer` sur les deux faces, styles du bouton supprimes
+3. **Etiquettes** — l'extension appelait `verify_tags_answers`, l'add-on corrigeait en local.
+   **Decision : retirer l'appel de l'extension** (2026-08-05). Le pool d'etiquettes est ferme,
+   l'eleve ne peut donc ecrire aucun synonyme a arbitrer. L'action reste dans le backend mais
+   **n'est plus appelee par aucun client** — a supprimer de `cloud-function/index.js` au prochain
+   deploiement si on veut nettoyer
+
+Ecarts restants, tous volontaires : l'OCR/capture d'ecran et la visionneuse PDF ne sont pas
+portables dans Apps Script ; l'ingestion des resultats (`analytics.js`) attend la phase 5 ; l'add-on
+charge encore ses polices depuis Google Fonts, ce qui est sans consequence pour lui (aucun examen
+Web Store) et evite le piege `//` de `HtmlService` sur un base64 de police.
 
 ## Chantier a venir — OAuth Google et plateforme web de resultats
 
@@ -421,4 +546,4 @@ Elles determinent si l'app web heritera de l'authentification ou s'il faudra tou
 - **Protection de l'endpoint Cloud Run** : le service est aujourd'hui public (`Access-Control-Allow-Origin: *`, aucune authentification) et son URL est dans ce repo GitHub **public** (`content.js`, et desormais `gas-addon/Code.gs`). N'importe qui peut donc consommer le quota Claude — **la cle API, elle, ne risque rien** : elle vit dans Secret Manager, n'est lue que cote serveur et n'apparait dans aucune reponse. Une limite de depenses est en place cote Anthropic, ce qui borne le risque financier en attendant. Le controle du domaine viendra naturellement avec l'OAuth : ne PAS coder d'authentification intermediaire, elle serait jetee
 - L'envoi de score du module complementaire : point de reprise deja documente dans `gas-addon/Code.gs`, section TEST DE LECTURE
 
-## Version actuelle : 2.0
+## Version actuelle : 2.0.1

@@ -40,6 +40,17 @@ if grep -q "A_REMPLIR" analytics.js; then
   exit 1
 fi
 
+# Une seule ressource distante suffit a classer l'extension en « code distant »
+# au Web Store, ce qui rallonge chaque examen de plusieurs jours. Les polices
+# sont embarquees dans fonts/ depuis la 2.1 (voir store-listing.md).
+if grep -rqn "fonts.googleapis.com\|fonts.gstatic.com\|cdn.jsdelivr.net\|unpkg.com" \
+     ./*.html ./*.css ./*.js; then
+  echo "REFUS : une ressource distante subsiste (police ou CDN)." >&2
+  grep -rn "fonts.googleapis.com\|fonts.gstatic.com\|cdn.jsdelivr.net\|unpkg.com" \
+    ./*.html ./*.css ./*.js >&2
+  exit 1
+fi
+
 # --- Verification de syntaxe ----------------------------------------------
 for f in analytics.js background.js content.js popup.js sidepanel.js pdfviewer.js theme-manager.js; do
   node --check "$f" >/dev/null || { echo "REFUS : erreur de syntaxe dans $f" >&2; exit 1; }
@@ -56,6 +67,7 @@ zip -r -q "$ARCHIVE" \
   sidepanel.html sidepanel.css sidepanel.js \
   pdfviewer.html pdfviewer.css pdfviewer.js \
   themes.css theme-manager.js \
+  fonts.css fonts \
   lib \
   icon16.png icon32.png icon48.png icon128.png logo-pedagokit.png \
   -x '*.DS_Store'

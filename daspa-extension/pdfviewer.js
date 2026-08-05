@@ -351,7 +351,12 @@ async function loadPdf() {
 
         state.pdf = await pdfjsLib.getDocument({
             url: url,
-            cMapUrl: 'https://cdn.jsdelivr.net/npm/pdfjs-dist@4.9.155/cmaps/',
+            // Tables d'encodage embarquees (lib/cmaps/) et non chargees depuis un
+            // CDN : une ressource distante classe l'extension en « code distant »
+            // au Web Store. Elles ne servent qu'aux PDF a encodage CID (chinois,
+            // japonais, coreen), mais un PDF de ce type s'afficherait en carres
+            // vides sans elles.
+            cMapUrl: chrome.runtime.getURL('lib/cmaps/'),
             cMapPacked: true
         }).promise;
 
