@@ -546,4 +546,11 @@ Elles determinent si l'app web heritera de l'authentification ou s'il faudra tou
 - **Protection de l'endpoint Cloud Run** : le service est aujourd'hui public (`Access-Control-Allow-Origin: *`, aucune authentification) et son URL est dans ce repo GitHub **public** (`content.js`, et desormais `gas-addon/Code.gs`). N'importe qui peut donc consommer le quota Claude — **la cle API, elle, ne risque rien** : elle vit dans Secret Manager, n'est lue que cote serveur et n'apparait dans aucune reponse. Une limite de depenses est en place cote Anthropic, ce qui borne le risque financier en attendant. Le controle du domaine viendra naturellement avec l'OAuth : ne PAS coder d'authentification intermediaire, elle serait jetee
 - L'envoi de score du module complementaire : point de reprise deja documente dans `gas-addon/Code.gs`, section TEST DE LECTURE
 
+## Decision strategique du 2026-09-14 — fusion dans Recto-versIA
+
+- **Recto-versIA devient la plateforme unique des eleves DASPA.** L'espace de cours FLE (sequences e-learning faites de modules reutilisables, referentiel CECR editable dans /admin, espace eleve avec etoile des competences) se construit dans `~/Documents/rectoVersIA/`, pas dans `daspa-app/`. Motif : rectoVersIA possede deja les constructeurs (10 types de questions, 12 exercices de vocabulaire, audio avec limite d'ecoutes, liseuse, ecriture), `daspa-app` n'a aucun contenu pedagogique
+- **L'extension et le module complementaire seront rattaches a Recto-versIA** via une route `/api/daspalecte/ingest` a jeton Google : le contrat d'ingestion (`IngestBody`) reste identique, seule l'URL de base change (`apiBase()` dans `analytics.js`, `Code.gs` pour l'add-on). `daspa-app` reste deployee jusqu'a verification en classe, puis s'eteindra (decision separee)
+- **Plan complet, avec les options ecartees** : `~/Documents/rectoVersIA/harnais/plans/2026-09-14-espace-fle.md` (valide le 2026-09-14). Les items #4, #5, #9 et #11 de la roadmap ci-dessus sont absorbes par ce chantier
+- Chatbot et production orale (micro eleve) : chantier ulterieur
+
 ## Version actuelle : 2.0.1
